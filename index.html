@@ -1,0 +1,2469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TA Record — Travel Authority</title>
+<!--
+  ══════════════════════════════════════════════════════════════════
+  GOOGLE SIGN-IN SETUP — read me first
+  ══════════════════════════════════════════════════════════════════
+  This app now requires Google Sign-In before it can be used.
+
+  1. Go to https://console.cloud.google.com/apis/credentials
+  2. Create (or select) a project, then click
+     "Create Credentials" → "OAuth client ID" → Application type: "Web application"
+  3. Under "Authorized JavaScript origins" add the exact URL(s) you will
+     host this file on, e.g. https://yourdomain.com or http://localhost:5500
+     (Google Sign-In will NOT work if you open this file directly from
+     your computer as file:///... — it must be served over http/https.)
+  4. Copy the generated Client ID (looks like
+     123456789-abcxyz.apps.googleusercontent.com)
+  5. Paste it below into GOOGLE_CLIENT_ID, replacing the placeholder.
+  ══════════════════════════════════════════════════════════════════
+-->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1A2744; --navy-mid: #263659;
+    --gold: #C9A227; --gold-light: #F5E9C0;
+    --bg: #EEF2F9; --white: #fff;
+    --text: #1F2937; --muted: #6B7280;
+    --border: #D1D9E6; --leg-bg: #F7F9FD;
+  }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--navy); color: #fff; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px; box-shadow: 0 2px 12px rgba(0,0,0,.28);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo-icon { width: 38px; height: 38px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .logo-text h1 { font-size: 15px; font-weight: 700; letter-spacing: .4px; }
+  .logo-text p  { font-size: 10px; color: #9BAAC5; letter-spacing: 1px; text-transform: uppercase; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .settings-btn {
+    background: rgba(255,255,255,.1); border: 1.5px solid rgba(255,255,255,.2);
+    color: #fff; border-radius: 8px; padding: 8px 16px; cursor: pointer;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+    display: flex; align-items: center; gap: 7px; transition: all .15s;
+  }
+  .settings-btn:hover { background: rgba(255,255,255,.2); border-color: var(--gold); color: var(--gold); }
+  .header-badge { font-size: 11px; font-weight: 700; letter-spacing: 1px; background: var(--gold); color: var(--navy); padding: 4px 12px; border-radius: 20px; }
+
+  /* ── MONTH SWITCHER ── */
+  .month-switcher { display: flex; align-items: center; gap: 6px; }
+  .month-arrow {
+    width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.08); color: #fff; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center; line-height: 1; transition: all .15s;
+    font-family: inherit; flex-shrink: 0;
+  }
+  .month-arrow:hover { background: var(--gold); border-color: var(--gold); color: var(--navy); }
+  .month-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px; background: var(--gold); color: var(--navy);
+    padding: 4px 14px; border-radius: 20px; cursor: pointer; white-space: nowrap; user-select: none;
+    transition: filter .15s;
+  }
+  .month-badge:hover { filter: brightness(1.06); }
+  .month-input-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .month-filter-note {
+    font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 8px; margin: -8px 0 14px;
+  }
+  .month-filter-note .clear-month-btn {
+    background: none; border: 1.5px solid var(--border); border-radius: 20px; color: var(--navy-mid);
+    font-size: 11px; font-weight: 700; padding: 3px 11px; cursor: pointer; font-family: inherit; transition: all .15s;
+  }
+  .month-filter-note .clear-month-btn:hover { border-color: var(--gold); background: var(--gold-light); }
+
+  /* ── MAIN ── */
+  main { max-width: 940px; margin: 28px auto; padding: 0 16px 60px; }
+
+  /* ── EMPLOYEE INFO BAR ── */
+  .emp-bar {
+    background: var(--white); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 20px; margin-bottom: 20px;
+    display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: flex-start;
+  }
+  .emp-bar.hidden { display: none; }
+  .emp-col { display: flex; flex-direction: column; gap: 2px; min-width: 96px; }
+  .emp-col .ec-label { font-size: 9px; font-weight: 800; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .emp-col .ec-val   { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .emp-divider { width: 1px; height: 36px; background: var(--border); flex-shrink: 0; align-self: center; }
+  @media (max-width: 600px) { .emp-divider { display: none; } }
+
+  /* ── SUMMARY BAR ── */
+  .summary-bar { background: var(--navy); border-radius: 10px; padding: 14px 20px; display: flex; gap: 26px; flex-wrap: wrap; margin-bottom: 20px; }
+  .sum-item .sum-label { font-size: 10px; color: #9BAAC5; letter-spacing: 1px; text-transform: uppercase; }
+  .sum-item .sum-val   { font-size: 19px; font-weight: 800; color: var(--gold); margin-top: 2px; }
+
+  /* ── CARD ── */
+  .card { background: var(--white); border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; overflow: hidden; }
+  .card-head { background: var(--navy); color: #fff; padding: 12px 20px; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; }
+  .card-body { padding: 20px; }
+
+  /* ── FIELDS ── */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .8px; text-transform: uppercase; }
+  input, select, textarea {
+    border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    font-size: 14px; color: var(--text); font-family: inherit; background: #fff;
+    transition: border-color .15s, box-shadow .15s; width: 100%;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-light); }
+  textarea { resize: vertical; min-height: 70px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* ── OBJECT BLOCK ── */
+  .object-block { background: linear-gradient(135deg, var(--navy) 0%, #2A3F6F 100%); border-radius: 10px; padding: 18px 20px; margin-bottom: 20px; }
+  .object-eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 1.4px; color: var(--gold); text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .object-eyebrow::before { content: ''; display: block; width: 20px; height: 2px; background: var(--gold); border-radius: 2px; }
+  .object-block input { background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.22); color: #fff; font-size: 16px; font-weight: 600; }
+  .object-block input::placeholder { color: rgba(255,255,255,.35); }
+  .object-block input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,162,39,.25); background: rgba(255,255,255,.18); }
+
+  /* ── SECTION LABEL ── */
+  .section-label { font-size: 11px; font-weight: 800; letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── LEG CARD ── */
+  .leg-card { background: var(--leg-bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .leg-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .leg-number { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--navy); background: var(--gold-light); border: 1px solid var(--gold); padding: 3px 10px; border-radius: 20px; }
+  .leg-remove { background: none; border: none; cursor: pointer; color: #EF4444; font-size: 18px; padding: 2px 6px; border-radius: 6px; transition: background .1s; line-height: 1; }
+  .leg-remove:hover { background: #FEE2E2; }
+
+  /* ── JOURNEY STRIP ── */
+  .journey-strip { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); border-radius: 8px; padding: 14px 18px; display: flex; align-items: center; margin-bottom: 12px; }
+  .station-box { flex: 1; }
+  .station-box .stn-label { font-size: 10px; color: #9BAAC5; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+  .station-box input { background: rgba(255,255,255,.1); border: 1.5px solid rgba(255,255,255,.2); color: #fff; font-size: 14px; font-weight: 600; }
+  .station-box input::placeholder { color: rgba(255,255,255,.35); }
+  .station-box input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,162,39,.25); background: rgba(255,255,255,.15); }
+  .arrow-zone { flex: 0 0 72px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 6px; }
+  .arrow-line { display: flex; align-items: center; width: 100%; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+  .line { flex: 1; height: 2px; background: repeating-linear-gradient(to right, var(--gold) 0, var(--gold) 5px, transparent 5px, transparent 10px); }
+  .arrow-head { color: var(--gold); font-size: 16px; line-height: 1; }
+  .train-pill { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: var(--gold); background: rgba(201,162,39,.15); border: 1px solid rgba(201,162,39,.3); padding: 2px 7px; border-radius: 20px; white-space: nowrap; max-width: 68px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── TIMES ROW ── */
+  .times-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+  @media (max-width: 600px) { .times-row { grid-template-columns: 1fr 1fr; } }
+  .dur-cell { text-align: center; padding-bottom: 10px; min-width: 68px; }
+  .dur-cell .dur-label { font-size: 10px; color: var(--muted); letter-spacing: .8px; text-transform: uppercase; }
+  .dur-cell .dur-val   { font-size: 13px; font-weight: 700; color: var(--navy); margin-top: 2px; }
+
+  /* ── ADD LEG BUTTON ── */
+  .add-leg-btn {
+    width: 100%; border: 2px dashed var(--border); background: none; border-radius: 10px;
+    padding: 13px; cursor: pointer; color: var(--navy-mid); font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: all .15s; font-family: inherit; margin-bottom: 18px;
+  }
+  .add-leg-btn:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-light); }
+  .plus-circle { width: 26px; height: 26px; border-radius: 50%; background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; line-height: 1; }
+
+  /* ── EDIT BANNER ── */
+  .edit-banner {
+    background: var(--gold-light); border: 1.5px solid var(--gold);
+    border-radius: 8px; padding: 11px 15px; margin-bottom: 18px;
+    font-size: 13px; font-weight: 600; color: var(--navy);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .edit-banner.hidden { display: none; }
+  .cancel-edit-btn { background: var(--navy); color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+
+  /* ── BUTTONS ── */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; padding: 11px 20px; transition: all .15s; font-family: inherit; }
+  .btn-primary { background: var(--navy); color: #fff; }
+  .btn-primary:hover { background: var(--navy-mid); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,39,68,.3); }
+  .btn-gold { background: var(--gold); color: var(--navy); }
+  .btn-gold:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn-ghost { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--navy); }
+
+  /* ── TA RULE PANEL (preview + saved) ── */
+  .ta-box { background: var(--leg-bg); border: 1.5px dashed var(--gold); border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
+  .ta-box.in-record { border-style: solid; border-color: var(--border); background: #FBFCFE; margin: 0; border-radius: 0; border-left: none; border-right: none; border-bottom: none; }
+  .ta-box-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .ta-box-head .ta-icon { font-size: 15px; }
+  .ta-box-head .ta-title { font-size: 12px; font-weight: 800; letter-spacing: .6px; color: var(--navy); text-transform: uppercase; }
+  .ta-note { font-size: 11px; color: var(--muted); margin-bottom: 12px; line-height: 1.55; }
+  .ta-table-wrap { overflow-x: auto; }
+  .ta-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .ta-table thead tr { background: var(--navy); color: #fff; }
+  .ta-table th { padding: 8px 12px; text-align: left; font-size: 10px; letter-spacing: .6px; white-space: nowrap; }
+  .ta-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .ta-table tbody tr:last-child td { border-bottom: none; }
+  .ta-total-row td { font-weight: 800; color: var(--navy); background: var(--gold-light); border-top: 2px solid var(--gold); }
+  .tier-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+  .tier-30  { background: #F3F4F6; color: #374151; border: 1px solid #D1D5DB; }
+  .tier-70  { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+  .tier-100 { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+  .ta-empty { font-size: 12px; color: var(--muted); padding: 6px 2px; }
+
+  /* ── CONTINGENCY ALLOWANCE ── */
+  .cont-card { background: var(--leg-bg); border: 1.5px solid var(--border); border-left: 4px solid #0F766E; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .cont-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .cont-number { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #0F766E; background: #CCFBF1; border: 1px solid #5EEAD4; padding: 3px 10px; border-radius: 20px; }
+  .cont-remove { background: none; border: none; cursor: pointer; color: #EF4444; font-size: 18px; padding: 2px 6px; border-radius: 6px; transition: background .1s; line-height: 1; }
+  .cont-remove:hover { background: #FEE2E2; }
+  .cont-grid { display: grid; grid-template-columns: 1.1fr 1.6fr .8fr .9fr; gap: 12px; align-items: end; }
+  @media (max-width: 760px) { .cont-grid { grid-template-columns: 1fr 1fr; } }
+  .cont-amount-cell { background: #CCFBF1; border: 1.5px solid #5EEAD4; border-radius: 8px; padding: 10px 12px; }
+  .cont-amount-cell label { color: #0F766E; }
+  .cont-amount-cell .cont-amount-val { font-size: 16px; font-weight: 800; color: #0F766E; margin-top: 2px; }
+  .add-cont-btn {
+    width: 100%; border: 2px dashed #5EEAD4; background: none; border-radius: 10px;
+    padding: 13px; cursor: pointer; color: #0F766E; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: all .15s; font-family: inherit; margin-bottom: 14px;
+  }
+  .add-cont-btn:hover { border-color: #0F766E; background: #CCFBF1; }
+  .plus-circle-teal { width: 26px; height: 26px; border-radius: 50%; background: #0F766E; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; line-height: 1; }
+  .cont-total-bar { background: #0F766E; border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .cont-total-bar .ctb-label { font-size: 11px; color: #99F6E4; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+  .cont-total-bar .ctb-val   { font-size: 18px; color: #fff; font-weight: 800; }
+  .cont-table thead tr { background: #0F766E; }
+  .cont-table .cont-total-row td { background: #CCFBF1; color: #0F766E; border-top: 2px solid #0F766E; }
+
+  /* ── SAVED RECORDS ── */
+  .record-block { border: 1.5px solid var(--border); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .record-block.editing-highlight { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-light); }
+  .record-head { background: var(--leg-bg); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .record-object { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .record-meta   { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.6; }
+  .record-actions { display: flex; gap: 4px; flex-shrink: 0; margin-top: 2px; }
+  .rec-btn { background: none; border: 1.5px solid transparent; cursor: pointer; font-size: 13px; padding: 5px 10px; border-radius: 6px; transition: all .1s; line-height: 1; font-family: inherit; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .rec-btn.edit { color: var(--navy-mid); border-color: var(--border); }
+  .rec-btn.edit:hover { background: var(--gold-light); border-color: var(--gold); color: var(--navy); }
+  .rec-btn.del  { color: #DC2626; border-color: var(--border); }
+  .rec-btn.del:hover  { background: #FEE2E2; border-color: #FECACA; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead tr { background: var(--navy); color: #fff; }
+  thead th { padding: 9px 12px; text-align: left; font-size: 10.5px; letter-spacing: .8px; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #F5F8FF; }
+  tbody td { padding: 9px 12px; vertical-align: middle; }
+  .badge-route { display: inline-flex; align-items: center; gap: 4px; background: var(--gold-light); color: var(--navy); border: 1px solid var(--gold); border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+  .rec-details-toggle { padding: 8px 16px; border-top: 1px solid var(--border); background: var(--leg-bg); }
+  .rec-details-btn {
+    background: none; border: 1.5px solid var(--border); border-radius: 6px;
+    padding: 5px 14px; font-size: 12px; font-weight: 600; color: var(--navy-mid);
+    cursor: pointer; font-family: inherit; transition: all .15s;
+  }
+  .rec-details-btn:hover { border-color: var(--gold); background: var(--gold-light); color: var(--navy); }
+  .empty-state .empty-icon { font-size: 36px; margin-bottom: 8px; }
+  .empty-state p { font-size: 13px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(10,20,45,.6); z-index: 300;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .modal-overlay.active { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--white); border-radius: 14px; width: 100%; max-width: 580px;
+    max-height: 92vh; overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(0,0,0,.35);
+    transform: translateY(16px) scale(.98); transition: transform .2s;
+  }
+  .modal-overlay.active .modal { transform: translateY(0) scale(1); }
+  .modal-head {
+    background: var(--navy); color: #fff; padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-radius: 14px 14px 0 0; position: sticky; top: 0; z-index: 1;
+  }
+  .modal-head-left { display: flex; align-items: center; gap: 10px; }
+  .modal-head-icon { width: 32px; height: 32px; background: var(--gold); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .modal-head h2 { font-size: 14px; font-weight: 700; }
+  .modal-head p  { font-size: 11px; color: #9BAAC5; margin-top: 1px; }
+  .modal-close { background: none; border: none; color: rgba(255,255,255,.6); font-size: 24px; cursor: pointer; line-height: 1; padding: 0 2px; transition: color .1s; }
+  .modal-close:hover { color: #fff; }
+  .modal-body { padding: 24px 20px 16px; }
+  .modal-section-title { font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .modal-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .modal-section { margin-bottom: 22px; }
+  .modal-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .modal-footer { padding: 0 20px 20px; display: flex; gap: 10px; align-items: center; }
+  .saved-chip { display: inline-flex; align-items: center; gap: 5px; background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; opacity: 0; transition: opacity .3s; }
+  .saved-chip.show { opacity: 1; }
+
+  /* ── RATE AUTO BOX (settings) ── */
+  .rate-auto-box { background: var(--navy); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .rate-auto-label { font-size: 11px; color: #9BAAC5; letter-spacing: .6px; text-transform: uppercase; font-weight: 700; }
+  .rate-auto-val { font-size: 18px; color: var(--gold); font-weight: 800; }
+  .rate-ref-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .rate-ref-table th { background: var(--leg-bg); color: var(--muted); text-align: left; padding: 8px 10px; font-size: 10px; letter-spacing: .6px; text-transform: uppercase; border-bottom: 1.5px solid var(--border); }
+  .rate-ref-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .rate-ref-table tbody tr:last-child td { border-bottom: none; }
+  .rate-ref-table td:last-child { font-weight: 700; color: var(--navy); }
+
+
+  /* ── PRINT / EXPORT MODAL ── */
+  .export-modal-overlay {
+    position: fixed; inset: 0; background: rgba(10,20,45,.6); z-index: 400;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .export-modal-overlay.active { opacity: 1; pointer-events: all; }
+  .export-modal {
+    background: var(--white); border-radius: 14px; width: 100%; max-width: 380px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.35);
+    transform: translateY(14px) scale(.98); transition: transform .2s;
+    overflow: hidden;
+  }
+  .export-modal-overlay.active .export-modal { transform: translateY(0) scale(1); }
+  .export-modal-head {
+    background: var(--navy); color: #fff; padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .export-modal-head h3 { font-size: 14px; font-weight: 700; }
+  .export-modal-head p  { font-size: 11px; color: #9BAAC5; margin-top: 2px; }
+  .emh-close { background: none; border: none; color: rgba(255,255,255,.6); font-size: 22px; cursor: pointer; line-height: 1; }
+  .emh-close:hover { color: #fff; }
+  .export-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .export-opt-btn {
+    display: flex; align-items: center; gap: 14px;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; background: none; cursor: pointer;
+    font-family: inherit; text-align: left; transition: all .15s; width: 100%;
+  }
+  .export-opt-btn:hover { border-color: var(--gold); background: var(--gold-light); }
+  .eob-icon  { font-size: 28px; flex-shrink: 0; }
+  .eob-label { font-size: 13px; font-weight: 700; color: var(--navy); display: block; }
+  .eob-desc  { font-size: 11px; color: var(--muted); margin-top: 2px; display: block; }
+  .export-modal-footer { padding: 0 16px 14px; }
+  .export-progress { font-size: 12px; color: var(--muted); text-align: center; padding: 6px 0 2px; }
+
+  /* ── PRINT ── */
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+    header, .no-print, .modal-overlay, .export-modal-overlay, .emp-bar,
+    .card.no-print, .btn-row, .month-filter-note,
+    .record-actions, .ta-box, .edit-banner, .card { display: none !important; }
+    body  { background:#fff; margin:0; padding:0; font-family:'Times New Roman',Times,serif; font-size:10pt; color:#000; }
+    main  { max-width:100%; margin:0; padding:0; }
+    .record-block { display:none !important; }
+    .print-journal { display:block !important; }
+
+    /* PAGE SETUP */
+    .print-page { width:100%; padding:10mm 12mm 8mm 12mm; page-break-after:always; }
+    .print-page:last-child { page-break-after:auto; }
+
+    /* ── TOP LINE: mob left | Railway name centre | blank right ── */
+    .pj-top { width:100%; border-collapse:collapse; margin-bottom:1mm; }
+    .pj-top td { padding:0; font-size:9.5pt; }
+    .pj-top .t-left  { width:33%; text-align:left; }
+    .pj-top .t-mid   { width:34%; text-align:center; font-size:12pt; font-weight:bold; }
+    .pj-top .t-right { width:33%; text-align:right; }
+
+    /* ── TITLE ── */
+    .pj-title { text-align:center; font-size:13pt; font-weight:bold; margin:1mm 0 2mm; }
+
+    /* ── HEADER INFO BLOCK ── */
+    .pj-info { font-size:9.5pt; line-height:2; margin-bottom:3mm; text-align:justify; }
+    .pj-uv { font-weight:bold; padding:0 0.5mm; }
+
+    /* ── MAIN TA TABLE ── */
+    .pj-table { width:100%; border-collapse:collapse; font-size:8.5pt; margin-top:2mm; }
+    .pj-table th, .pj-table td { border:1px solid #000; padding:1mm 1mm; vertical-align:middle; text-align:center; }
+    /* Reset screen-level thead color so no ink fills headers */
+    thead tr { background: #fff !important; color: #000 !important; }
+    .pj-table th { font-weight:bold; font-size:8pt; line-height:1.3; background:#fff; color:#000; }
+    .pj-c-date  { width:11%; }
+    .pj-c-train { width:8%; }
+    .pj-c-time  { width:7%; }
+    .pj-c-stn   { width:6%; }
+    .pj-c-km    { width:9%; font-size:7.5pt; }
+    .pj-c-obj   { width:29%; }
+    .pj-c-rs    { width:7%; }
+    .pj-c-p     { width:4%; }
+    .pj-td-l    { text-align:left; padding-left:1.5mm; }
+    .pj-td-r    { text-align:right; }
+    .pj-td-ditto { font-size:9pt; }
+    .pj-tr-total td { font-weight:bold; border-top:2px solid #000; }
+    .pj-subtotal-row td { border-top:1.5px solid #888; border-bottom:1.5px solid #888; font-size:8pt; }
+    .pj-grand-total-row td { border-top:2.5px solid #000; font-weight:bold; }
+
+    /* ── CONTINGENT PLAIN TEXT ── */
+    .pj-cont-blk { font-size:9.5pt; line-height:2; margin:3mm 0 1mm; }
+
+    /* ── RIGHT-ALIGNED TOTALS matching PDF layout ── */
+    .pj-tot-wrap { text-align:right; margin-top:2mm; }
+    .pj-tot { display:inline-table; border-collapse:collapse; font-size:10.5pt; }
+    .pj-tot td { padding:0.5mm 2mm; }
+    .pj-tot .tl { text-align:left; min-width:32mm; }
+    .pj-tot .tr { text-align:right; font-weight:bold; min-width:22mm; border-bottom:1px solid #000; }
+    .pj-tot .tp { text-align:left; width:12mm; border-bottom:1px solid #000; }
+    .pj-tot .tr-grand td { border-top:2px solid #000; border-bottom:2px solid #000; font-size:11pt; }
+
+    /* ── PAGE 2: SUMMARY ── */
+    .pj-p2-title { margin-bottom:0; }
+    .pj-sum-tbl { width:100%; border-collapse:collapse; font-size:10pt; margin-bottom:5mm; }
+    .pj-sum-tbl th, .pj-sum-tbl td { border:1px solid #000; padding:1.5mm 2.5mm; }
+    .pj-sum-tbl th { font-weight:bold; background:#fff; color:#000; }
+    .pj-sum-grand td { font-weight:bold; border-top:2px solid #000; }
+
+    /* Two-page model: summary block never splits across pages;
+       if it doesn't fit on the TA page it moves to a fresh page */
+    .pj-summary-block {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-before: auto;
+      break-before: auto;
+    }
+    .pj-cert { font-size:9.5pt; line-height:2; margin:4mm 0; }
+    .pj-cert p { margin:0; }
+    .pj-sig-r { text-align:right; margin-top:10mm; font-size:9.5pt; line-height:2; }
+    .pj-counter-para { font-size:9.5pt; line-height:2; margin:5mm 0 2mm; text-align:justify; }
+    .pj-sig-lr { width:100%; margin-top:8mm; font-size:9.5pt; }
+    .pj-sig-lr td { vertical-align:bottom; }
+    .pj-sig-lr .srl { text-align:left; }
+    .pj-sig-lr .srr { text-align:right; }
+  }
+
+  .print-journal { display:none; }
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN GATE ══ -->
+<div id="loginGate" style="position:fixed; inset:0; z-index:9999; background:linear-gradient(135deg,#1A2744 0%,#2A3F6F 100%); display:flex; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:#fff; border-radius:14px; padding:40px 36px; max-width:380px; width:100%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.35);">
+    <div style="width:56px; height:56px; background:#C9A227; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 18px;">✈️</div>
+    <h1 style="font-size:18px; font-weight:800; color:#1A2744; margin-bottom:6px;">TA Record</h1>
+    <p style="font-size:13px; color:#6B7280; margin-bottom:26px;">Sign in with Google to access your Travel Authority records</p>
+    <div id="googleSignInBtn" style="display:flex; justify-content:center; margin-bottom:14px;"></div>
+    <p id="loginGateError" style="font-size:12px; color:#B91C1C; display:none; margin-top:10px; line-height:1.5;"></p>
+    <p style="font-size:11px; color:#9CA3AF; margin-top:18px; line-height:1.5;">Your records are stored only in this browser, kept separate per Google account.</p>
+  </div>
+</div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div class="modal-head-icon">⚙️</div>
+        <div>
+          <h2>Employee Settings</h2>
+          <p>Your profile shown on every TA record</p>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeSettings()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="modal-section">
+        <div class="modal-section-title">Personal Information</div>
+        <div class="grid-2" style="margin-bottom:14px">
+          <div class="field">
+            <label>Full Name</label>
+            <input type="text" id="s_name" placeholder="e.g. Ahmad bin Ismail" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label>Employee No.</label>
+            <input type="text" id="s_empno" placeholder="e.g. JK/2023/001" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+        </div>
+        <div class="grid-2" style="margin-bottom:14px">
+          <div class="field">
+            <label>Date of Appointment</label>
+            <input type="date" id="s_doa" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Designation</label>
+            <input type="text" id="s_desig" placeholder="e.g. Sr. Clerk, JE, SSE…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Level / Grade</label>
+            <select id="s_level" onchange="updateRatePreview()"></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-title">Pay & Posting</div>
+        <div class="grid-2" style="margin-bottom:14px">
+          <div class="field">
+            <label>Pay (Rs.)</label>
+            <input type="text" id="s_pay" placeholder="e.g. 32,000.00" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label>Bill Unit</label>
+            <input type="text" id="s_billunit" placeholder="e.g. Unit Kewangan" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+        </div>
+        <div class="grid-2" style="margin-bottom:14px">
+          <div class="field">
+            <label>Headquarters</label>
+            <input type="text" id="s_hq" placeholder="e.g. ASR/NR" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label>Zone</label>
+            <input type="text" id="s_zone" placeholder="e.g. Northern Railway" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Department</label>
+            <input type="text" id="s_dept" placeholder="e.g. Mechanical" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label>Mobile No.</label>
+            <input type="tel" id="s_mob" placeholder="e.g. 9876543210" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-section" style="margin-bottom:6px">
+        <div class="modal-section-title">TA Daily Allowance Rate</div>
+        <div class="rate-auto-box">
+          <div class="rate-auto-label">Your Rate (auto-set from Level)</div>
+          <div class="rate-auto-val" id="s_rateDisplay">Select a Level above</div>
+        </div>
+        <div class="modal-hint" style="margin-bottom:12px">
+          The full daily allowance rate is fixed by Pay Level. The app applies this automatically to every TA record using the 30% / 70% / 100% rule — no manual entry needed.
+        </div>
+        <table class="rate-ref-table">
+          <thead><tr><th>Pay Level in Pay Matrix</th><th>Rate (Per Day)</th></tr></thead>
+          <tbody>
+            <tr><td>Level 14 and above</td><td>Rs. 1,500</td></tr>
+            <tr><td>Level 12 and 13</td><td>Rs. 1,250</td></tr>
+            <tr><td>Level 9 to 11</td><td>Rs. 1,125</td></tr>
+            <tr><td>Level 6 to 8</td><td>Rs. 1,000</td></tr>
+            <tr><td>Level 5 and below</td><td>Rs. 625</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+      <button class="btn btn-ghost"   onclick="closeSettings()">Cancel</button>
+      <span class="saved-chip" id="savedChip">✓ Saved</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PRINT DIALOG ══ -->
+<div class="modal-overlay" id="printDialog">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div class="modal-head-icon">🖨️</div>
+        <div><h2>Print / Export</h2><p>Choose output format</p></div>
+      </div>
+      <button class="modal-close" onclick="closePrintDialog()">×</button>
+    </div>
+    <div class="modal-body" style="padding:20px">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" onclick="closePrintDialog();buildAndPrint()">
+          🖨️&nbsp; Print TA Journal (PDF)
+        </button>
+        <button class="btn" style="width:100%;justify-content:center;padding:14px;background:#2563EB;color:#fff" onclick="closePrintDialog();doWordExport()">
+          📄&nbsp; Export as Word (.docx)
+        </button>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="closePrintDialog()">
+          Cancel
+        </button>
+      </div>
+      <div style="margin-top:14px;font-size:11px;color:var(--muted);line-height:1.5">
+        <b>Print PDF</b> opens the browser print dialog — save as PDF from there.<br>
+        <b>Export Word</b> downloads a .docx file you can edit in Microsoft Word.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EXPORT MODAL ══ -->
+<div class="export-modal-overlay no-print" id="exportModal">
+  <div class="export-modal">
+    <div class="export-modal-head">
+      <div>
+        <h3>🖨️ Print / Export TA Journal</h3>
+        <p id="exportModalSub">Choose output format</p>
+      </div>
+      <button class="emh-close" onclick="closeExportModal()">×</button>
+    </div>
+    <div class="export-modal-body">
+      <button class="export-opt-btn" onclick="doPrint()">
+        <span class="eob-icon">🖨️</span>
+        <span>
+          <span class="eob-label">Print / Save as PDF</span>
+          <span class="eob-desc">Opens browser print dialog — save as PDF or send to printer</span>
+        </span>
+      </button>
+      <button class="export-opt-btn" onclick="doWordExport()">
+        <span class="eob-icon">📝</span>
+        <span>
+          <span class="eob-label">Export as Word (.docx)</span>
+          <span class="eob-desc">Download an editable Word document of the TA journal</span>
+        </span>
+      </button>
+    </div>
+    <div class="export-modal-footer">
+      <div class="export-progress" id="exportProgress">⏳ Generating Word document…</div>
+      <button class="btn btn-ghost" style="width:100%" onclick="closeExportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="header-left">
+    <button class="settings-btn no-print" onclick="openSettings()">⚙️ Settings</button>
+  </div>
+  <div class="header-right">
+    <div class="month-switcher">
+      <button class="month-arrow no-print" onclick="changeMonth(-1)" title="Previous month">‹</button>
+      <label class="month-badge" for="monthPicker" id="monthBadgeLabel">JUNE 2026</label>
+      <input type="month" id="monthPicker" class="month-input-hidden no-print" onchange="onMonthPickerChange()" />
+      <button class="month-arrow no-print" onclick="changeMonth(1)" title="Next month">›</button>
+    </div>
+    <div class="no-print" id="userChip" style="display:none; align-items:center; gap:8px; margin-left:8px; padding-left:12px; border-left:1px solid rgba(255,255,255,.2);">
+      <img id="userAvatar" src="" alt="" style="width:26px; height:26px; border-radius:50%; display:none;" />
+      <span id="userNameLabel" style="font-size:12px; font-weight:600; color:#fff; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+      <button class="settings-btn no-print" style="padding:6px 12px; font-size:11px;" onclick="signOutOfApp()">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- EMPLOYEE INFO BAR -->
+  <div class="emp-bar hidden" id="empBar">
+    <div class="emp-col"><div class="ec-label">Name</div><div class="ec-val" id="eb_name"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Emp. No.</div><div class="ec-val" id="eb_empno"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Designation</div><div class="ec-val" id="eb_desig"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Date of Appointment</div><div class="ec-val" id="eb_doa"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Level / Grade</div><div class="ec-val" id="eb_level"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Pay</div><div class="ec-val" id="eb_pay"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Bill Unit</div><div class="ec-val" id="eb_billunit"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Headquarters</div><div class="ec-val" id="eb_hq"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Zone</div><div class="ec-val" id="eb_zone"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Department</div><div class="ec-val" id="eb_dept"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Mobile No.</div><div class="ec-val" id="eb_mob"></div></div>
+    <div class="emp-divider"></div>
+    <div class="emp-col"><div class="ec-label">Daily TA Rate</div><div class="ec-val" id="eb_taRate"></div></div>
+  </div>
+
+  <!-- FORM CARD -->
+  <div class="card no-print">
+    <div class="card-head">
+      <span id="formTitle">✏️ New TA Entry</span>
+    </div>
+    <div class="card-body">
+
+      <!-- EDIT MODE BANNER -->
+      <div class="edit-banner hidden" id="editBanner">
+        <span>✏️ Editing a saved record — make your changes then click <strong>Update TA Record</strong></span>
+        <button class="cancel-edit-btn" onclick="cancelEdit()">✕ Cancel Edit</button>
+      </div>
+
+      <!-- 1. OBJECT OF JOURNEY (top) -->
+      <div class="object-block">
+        <div class="object-eyebrow">Object of Journey</div>
+        <input type="text" id="objectInput" placeholder="e.g. Official duty, site inspection, meeting at HQ…" />
+      </div>
+
+      <!-- 3. JOURNEY LEGS -->
+      <div class="section-label">Journey Legs</div>
+      <div id="legsContainer"></div>
+
+      <button class="add-leg-btn" onclick="addLeg()">
+        <span class="plus-circle">+</span>
+        Add Another Train / Leg
+      </button>
+
+      <!-- 4. TA RULE — LIVE PREVIEW -->
+      <div class="ta-box">
+        <div class="ta-box-head">
+          <span class="ta-icon">📊</span>
+          <span class="ta-title">TA Entitlement Preview (auto-calculated)</span>
+        </div>
+        <div id="taPreviewBody"><div class="ta-empty">Fill in dates &amp; times above to see the breakdown.</div></div>
+      </div>
+
+      <!-- 5. CONTINGENCY ALLOWANCE -->
+      <div class="section-label">Contingent Charge</div>
+      <div id="contingencyContainer"></div>
+      <div id="contEmptyState" class="ta-empty" style="margin-bottom:14px">No contingent charge entries added yet (optional).</div>
+
+      <button class="add-cont-btn" onclick="addContingency()">
+        <span class="plus-circle-teal">+</span>
+        Add Contingent Charge Entry
+      </button>
+
+      <div class="cont-total-bar" id="contTotalBar" style="display:none">
+        <span class="ctb-label">Total Contingent Charge</span>
+        <span class="ctb-val" id="contTotalVal">Rs. 0.00</span>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="saveBtn" onclick="saveRecord()">💾 Save TA Record</button>
+        <button class="btn btn-ghost" onclick="clearForm()">✖ Clear Form</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SAVED RECORDS CARD -->
+  <div class="card">
+    <div class="card-head">📋&nbsp; Saved TA Records</div>
+    <div class="card-body" style="padding:16px">
+      <div class="month-filter-note no-print" id="monthFilterNote"></div>
+      <div id="recordsContainer">
+        <div class="empty-state">
+          <div class="empty-icon">🚉</div>
+          <p>No records yet. Fill in the form above and click <strong>Save TA Record</strong>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ACTIONS (no clear-all by design) -->
+  <div class="btn-row no-print">
+    <button class="btn btn-gold" onclick="openExportModal()">🖨️ Print / Export</button>
+  </div>
+
+  <!-- PRINT JOURNAL (hidden on screen, visible in print) -->
+  <div class="print-journal" id="printJournal"></div>
+
+</main>
+
+<script>
+  /* ══════════════════════════════════════════════════════════════
+     GOOGLE SIGN-IN
+     Replace this with your own Client ID — see the setup comment
+     in <head>. Until a real Client ID is set, the button will show
+     a helpful error instead of silently failing.
+     ══════════════════════════════════════════════════════════════ */
+  const GOOGLE_CLIENT_ID = '662753516550-mg8m1h9bfm9jkmonkn0qa7q1eaioo0ck.apps.googleusercontent.com';
+
+  const AUTH_SESSION_KEY = 'ta_auth_session';
+
+  function base64UrlDecode(str) {
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (str.length % 4) str += '=';
+    return decodeURIComponent(atob(str).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+  }
+
+  function decodeGoogleJwt(token) {
+    const payload = token.split('.')[1];
+    return JSON.parse(base64UrlDecode(payload));
+  }
+
+  function handleGoogleCredential(response) {
+    try {
+      const profile = decodeGoogleJwt(response.credential);
+      const session = {
+        email: profile.email,
+        name: profile.name || profile.email,
+        picture: profile.picture || '',
+        signedInAt: new Date().toISOString()
+      };
+      sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+      enterApp(session);
+    } catch (err) {
+      showLoginError('Could not read your Google profile. Please try again.');
+    }
+  }
+
+  function showLoginError(msg) {
+    const el = document.getElementById('loginGateError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function initGoogleSignIn(attempt) {
+    attempt = attempt || 0;
+    if (GOOGLE_CLIENT_ID.indexOf('YOUR_GOOGLE_CLIENT_ID') === 0) {
+      showLoginError('Google Sign-In is not configured yet. Open this file\'s source and set GOOGLE_CLIENT_ID (see the setup instructions at the top of the HTML).');
+      return;
+    }
+    if (typeof google === 'undefined' || !google.accounts) {
+      if (attempt < 20) {
+        // Google's script loads async — wait and retry for a few seconds
+        // before showing an error (helps on slower mobile connections).
+        setTimeout(function() { initGoogleSignIn(attempt + 1); }, 250);
+        return;
+      }
+      showLoginError('Could not load Google Sign-In. This can happen if an ad blocker or privacy extension is blocking accounts.google.com, or if your network blocks Google domains. Try disabling any content blocker for this site, or try a different network, then reload the page.');
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential,
+      auto_select: true
+    });
+    google.accounts.id.renderButton(
+      document.getElementById('googleSignInBtn'),
+      { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', width: 260 }
+    );
+    google.accounts.id.prompt();
+  }
+
+  function storageKeyFor(base, email) {
+    return base + '__' + email.toLowerCase();
+  }
+
+  function enterApp(session) {
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('userChip').style.display = 'flex';
+    document.getElementById('userNameLabel').textContent = session.name;
+    if (session.picture) {
+      const avatar = document.getElementById('userAvatar');
+      avatar.src = session.picture;
+      avatar.style.display = 'block';
+    }
+
+    // Load this user's own records/settings (each Google account gets its own data)
+    records  = JSON.parse(localStorage.getItem(storageKeyFor('ta_records_v2', session.email)) || '[]');
+    settings = JSON.parse(localStorage.getItem(storageKeyFor('ta_settings', session.email))   || '{}');
+    currentUserEmail = session.email;
+
+    populateLevelOptions();
+    renderEmpBar();
+    updateContEmptyState();
+    renderRecords();
+  }
+
+  function signOutOfApp() {
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+    if (typeof google !== 'undefined' && google.accounts) {
+      google.accounts.id.disableAutoSelect();
+    }
+    location.reload();
+  }
+
+  function checkExistingSession() {
+    const raw = sessionStorage.getItem(AUTH_SESSION_KEY);
+    if (raw) {
+      try {
+        enterApp(JSON.parse(raw));
+        return;
+      } catch (e) { /* fall through to login */ }
+    }
+    initGoogleSignIn();
+  }
+
+  let currentUserEmail = null;
+
+  let records    = [];
+  let settings   = {};
+  let legCounter = 0;
+  let editingId  = null;
+  let selectedMonth = currentYYYYMM(); // 'YYYY-MM' or 'ALL'
+
+  /* ── BASIC HELPERS ── */
+  function fmt12(t) {
+    if (!t) return '—';
+    const [h, m] = t.split(':').map(Number);
+    return `${((h%12)||12).toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} ${h>=12?'PM':'AM'}`;
+  }
+  function fmtDate(d) {
+    if (!d) return '—';
+    const [y,mo,day] = d.split('-');
+    return `${day} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]} ${y}`;
+  }
+
+  /* ── MONTH SWITCHER ── */
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function currentYYYYMM() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }
+  function monthLabel(ym) {
+    if (ym === 'ALL') return 'All Records';
+    const [y, m] = ym.split('-').map(Number);
+    return `${MONTH_NAMES[m-1]} ${y}`;
+  }
+  function setMonthBadge() {
+    document.getElementById('monthBadgeLabel').textContent = monthLabel(selectedMonth).toUpperCase();
+    const picker = document.getElementById('monthPicker');
+    if (selectedMonth !== 'ALL') picker.value = selectedMonth;
+  }
+  function changeMonth(delta) {
+    if (selectedMonth === 'ALL') selectedMonth = currentYYYYMM();
+    let [y, m] = selectedMonth.split('-').map(Number);
+    m += delta;
+    if (m < 1)  { m = 12; y--; }
+    if (m > 12) { m = 1;  y++; }
+    selectedMonth = `${y}-${String(m).padStart(2,'0')}`;
+    setMonthBadge();
+    renderRecords();
+  }
+  function onMonthPickerChange() {
+    const v = document.getElementById('monthPicker').value;
+    if (v) { selectedMonth = v; setMonthBadge(); renderRecords(); }
+  }
+  function showAllMonths() {
+    selectedMonth = 'ALL';
+    setMonthBadge();
+    renderRecords();
+  }
+  function recordMatchesMonth(rec, ym) {
+    if (ym === 'ALL') return true;
+    const b = rec.taBreakdown || computeBreakdown(rec.legs);
+    if (b && b.length) return b.some(s => s.date.startsWith(ym));
+    return rec.legs.some(l => (l.dateFrom && l.dateFrom.startsWith(ym)) || (l.dateTo && l.dateTo.startsWith(ym)));
+  }
+  function getMonthRecords() {
+    return records.filter(r => recordMatchesMonth(r, selectedMonth));
+  }
+
+  function getDur(tl, ta) {
+    if (!tl || !ta) return '—';
+    const [lh,lm] = tl.split(':').map(Number);
+    const [ah,am] = ta.split(':').map(Number);
+    let d = (ah*60+am)-(lh*60+lm);
+    if (d < 0) d += 1440;
+    return d >= 60 ? `${Math.floor(d/60)}h ${d%60}m` : `${d}m`;
+  }
+  function calcLegDur(idx) {
+    const tl = document.getElementById(`tl_${idx}`)?.value;
+    const ta = document.getElementById(`ta_${idx}`)?.value;
+    const el = document.getElementById(`dur_${idx}`);
+    if (el) el.textContent = getDur(tl, ta);
+  }
+  function updatePill(idx) {
+    const v  = document.getElementById(`train_${idx}`)?.value.trim();
+    const el = document.getElementById(`pill_${idx}`);
+    if (el) el.textContent = v || 'TRAIN';
+  }
+  function onLegFieldChange(idx) {
+    calcLegDur(idx);
+    refreshPreview();
+  }
+
+  /* ── TA RULE ENGINE ── */
+  function combineDT(dateStr, timeStr) {
+    return new Date(`${dateStr}T${timeStr}:00`);
+  }
+  function legSpan(leg) {
+    const start = combineDT(leg.dateFrom, leg.timeLeft);
+    const endDateStr = leg.dateTo && leg.dateTo.length ? leg.dateTo : leg.dateFrom;
+    let end = combineDT(endDateStr, leg.timeArrived);
+    if (end <= start) end = new Date(end.getTime() + 24*60*60*1000); // crossed midnight, not flagged via Date To
+    return { start, end };
+  }
+  function dateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function tierForHours(hours) {
+    if (hours <= 6)  return { pct: 30,  label: 'Up to 6 hrs' };
+    if (hours <= 12) return { pct: 70,  label: 'Above 6–12 hrs' };
+    return             { pct: 100, label: 'Above 12–24 hrs' };
+  }
+  function fmtHours(h) {
+    const hh = Math.floor(h);
+    const mm = Math.round((h - hh) * 60);
+    return mm ? `${hh}h ${mm}m` : `${hh}h`;
+  }
+  function splitByDay(start, end) {
+    const segments = [];
+    let cursor = new Date(start);
+    while (cursor < end) {
+      const next = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 0, 0, 0, 0);
+      const segEnd = next < end ? next : end;
+      const hours = (segEnd - cursor) / 3600000;
+      segments.push({ date: dateKey(cursor), hours, ...tierForHours(hours) });
+      cursor = segEnd;
+    }
+    return segments;
+  }
+  function computeBreakdown(legs) {
+    const valid = (legs || []).filter(l => l.dateFrom && l.timeLeft && l.timeArrived);
+    if (!valid.length) return null;
+    let minStart = null, maxEnd = null;
+    for (const leg of valid) {
+      const { start, end } = legSpan(leg);
+      if (isNaN(start) || isNaN(end)) continue;
+      if (!minStart || start < minStart) minStart = start;
+      if (!maxEnd   || end   > maxEnd)   maxEnd   = end;
+    }
+    if (!minStart || !maxEnd || maxEnd <= minStart) return null;
+    return splitByDay(minStart, maxEnd);
+  }
+
+  /* ── CROSS-RECORD BOUNDARY-DATE MERGE ──
+     If one TA record ends on a date and the very next TA record (chronologically)
+     starts on that SAME date, the person was only briefly at headquarters that
+     day before heading out again. Railway TA rules treat that as one continuous
+     day away, so the hours from both records on that shared date must be added
+     together and the 30/70/100% tier decided on the COMBINED hours, not judged
+     separately on each fragment.
+     Returns a Map<recordId, segments[]> where:
+       - the EARLIER record's segment on the shared date is blanked out
+         (carriedForward: true, pct: null) since its hours were absorbed
+       - the LATER record's segment on the shared date carries the full
+         combined-hours tier/pct for that date (mergedFromPrev: true)
+  */
+  function recordBoundarySpan(rec) {
+    const legs = (rec.legs || []).filter(l => l.dateFrom && l.timeLeft && l.timeArrived);
+    if (!legs.length) return null;
+    let minStart = null, maxEnd = null;
+    for (const leg of legs) {
+      const { start, end } = legSpan(leg);
+      if (isNaN(start) || isNaN(end)) continue;
+      if (!minStart || start < minStart) minStart = start;
+      if (!maxEnd   || end   > maxEnd)   maxEnd   = end;
+    }
+    if (!minStart || !maxEnd) return null;
+    return { start: minStart, end: maxEnd };
+  }
+
+  function getAllAdjustedBreakdowns(allRecords) {
+    const items = (allRecords || []).map(rec => {
+      const raw = rec.taBreakdown || computeBreakdown(rec.legs);
+      const span = recordBoundarySpan(rec);
+      return { rec, raw, span };
+    }).filter(it => it.raw && it.span);
+
+    items.sort((a, b) => a.span.start - b.span.start);
+
+    const resultMap = new Map();
+    items.forEach(it => {
+      resultMap.set(it.rec.id, it.raw.map(seg => ({ ...seg, carriedForward: false })));
+    });
+
+    for (let i = 0; i < items.length - 1; i++) {
+      const cur = items[i];
+      const next = items[i + 1];
+      const curEndMoment = new Date(cur.span.end.getTime() - 1); // last instant of the span
+      const curEndDateKey = dateKey(curEndMoment);
+      const nextStartDateKey = dateKey(next.span.start);
+      if (curEndDateKey !== nextStartDateKey) continue; // no shared boundary date
+
+      const curSegs  = resultMap.get(cur.rec.id);
+      const nextSegs = resultMap.get(next.rec.id);
+      const curSeg  = curSegs.find(s => s.date === curEndDateKey);
+      const nextSeg = nextSegs.find(s => s.date === nextStartDateKey);
+      if (!curSeg || !nextSeg) continue;
+
+      const combinedHours = curSeg.hours + nextSeg.hours;
+      const combinedTier = tierForHours(combinedHours);
+
+      curSeg.carriedForward = true;
+      curSeg.pct = null;
+      curSeg.label = null;
+
+      nextSeg.hours = combinedHours;
+      nextSeg.pct = combinedTier.pct;
+      nextSeg.label = combinedTier.label;
+      nextSeg.mergedFromPrev = true;
+    }
+
+    return resultMap;
+  }
+
+  function renderTAPanel(segments, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!segments || !segments.length) {
+      container.innerHTML = `<div class="ta-empty">Fill in dates &amp; times above to see the breakdown.</div>`;
+      return;
+    }
+    const rate = getDailyRateForLevel(settings.level);
+    const hasRate = rate !== null && rate > 0;
+    let totalPct = 0, totalAmount = 0;
+
+    const rows = segments.map(s => {
+      if (s.carriedForward) {
+        return `
+          <tr style="opacity:.6">
+            <td>${fmtDate(s.date)}</td>
+            <td>${fmtHours(s.hours)}</td>
+            <td colspan="${hasRate ? 3 : 2}" style="font-style:italic;color:var(--muted)">Counted with next TA on this date — see that record</td>
+          </tr>`;
+      }
+      totalPct += s.pct;
+      const amount = hasRate ? (rate * s.pct / 100) : null;
+      if (amount !== null) totalAmount += amount;
+      return `
+        <tr>
+          <td>${fmtDate(s.date)}</td>
+          <td>${fmtHours(s.hours)}</td>
+          <td><span class="tier-badge tier-${s.pct}">${s.label}</span>${s.mergedFromPrev ? ' <span style="font-size:9px;color:var(--muted)">(incl. prior TA)</span>' : ''}</td>
+          <td style="font-weight:800;color:var(--navy)">${s.pct}%</td>
+          ${hasRate ? `<td style="font-weight:700;color:var(--navy)">Rs. ${amount.toFixed(2)}</td>` : ''}
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      ${!hasRate ? `<div class="ta-empty" style="margin-bottom:8px">Set your Pay Level in Settings to see Rs. amounts — showing percentage only.</div>` : ''}
+      <div class="ta-table-wrap">
+        <table class="ta-table">
+          <thead>
+            <tr>
+              <th>Date</th><th>Hours Counted</th><th>Tier</th><th>TA %</th>
+              ${hasRate ? '<th>Amount</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr class="ta-total-row">
+              <td colspan="${hasRate ? 3 : 3}">${segments.length} day${segments.length>1?'s':''} total</td>
+              <td>${hasRate ? '' : ''}</td>
+              ${hasRate ? `<td>Rs. ${totalAmount.toFixed(2)}</td>` : ''}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function getLegsLoose() {
+    const cards = document.querySelectorAll('#legsContainer .leg-card');
+    const legs = [];
+    cards.forEach(card => {
+      const id = card.id.replace('leg_', '');
+      legs.push({
+        dateFrom:    document.getElementById(`df_${id}`)?.value,
+        dateTo:      document.getElementById(`dt_${id}`)?.value,
+        timeLeft:    document.getElementById(`tl_${id}`)?.value,
+        timeArrived: document.getElementById(`ta_${id}`)?.value,
+      });
+    });
+    return legs;
+  }
+
+  function refreshPreview() {
+    const segments = computeBreakdown(getLegsLoose());
+    renderTAPanel(segments, 'taPreviewBody');
+  }
+
+  /* ── SETTINGS ── */
+  function populateLevelOptions() {
+    const sel = document.getElementById('s_level');
+    if (!sel || sel.options.length) return;
+    sel.innerHTML = '<option value="">— Select Level —</option>' +
+      Array.from({ length: 16 }, (_, i) => i + 1)
+        .map(n => `<option value="Level ${n}">Level ${n}</option>`)
+        .join('');
+  }
+
+  // Fixed Pay-Level → Daily Allowance Rate table
+  function getDailyRateForLevel(levelStr) {
+    if (!levelStr) return null;
+    const m = /Level\s*(\d+)/i.exec(levelStr);
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    if (n >= 14) return 1500;
+    if (n === 12 || n === 13) return 1250;
+    if (n >= 9 && n <= 11) return 1125;
+    if (n >= 6 && n <= 8)  return 1000;
+    if (n <= 5) return 625;
+    return null;
+  }
+
+  function updateRatePreview() {
+    const level = document.getElementById('s_level').value;
+    const rate  = getDailyRateForLevel(level);
+    const el    = document.getElementById('s_rateDisplay');
+    el.textContent = rate !== null ? `Rs. ${rate.toLocaleString()} / day` : 'Select a Level above';
+  }
+
+  function openSettings() {
+    populateLevelOptions();
+    document.getElementById('s_name').value     = settings.name     || '';
+    document.getElementById('s_empno').value    = settings.empno    || '';
+    document.getElementById('s_doa').value      = settings.doa      || '';
+    document.getElementById('s_desig').value    = settings.desig    || '';
+    document.getElementById('s_level').value    = settings.level    || '';
+    document.getElementById('s_pay').value      = settings.pay      || '';
+    document.getElementById('s_billunit').value = settings.billunit || '';
+    document.getElementById('s_hq').value       = settings.hq       || '';
+    document.getElementById('s_zone').value     = settings.zone     || '';
+    document.getElementById('s_dept').value     = settings.dept     || '';
+    document.getElementById('s_mob').value      = settings.mob      || '';
+    updateRatePreview();
+    document.getElementById('savedChip').classList.remove('show');
+    document.getElementById('settingsModal').classList.add('active');
+  }
+  function closeSettings() {
+    document.getElementById('settingsModal').classList.remove('active');
+  }
+  function saveSettings() {
+    settings = {
+      name:     document.getElementById('s_name').value.trim(),
+      empno:    document.getElementById('s_empno').value.trim(),
+      doa:      document.getElementById('s_doa').value,
+      desig:    document.getElementById('s_desig').value.trim(),
+      level:    document.getElementById('s_level').value.trim(),
+      pay:      document.getElementById('s_pay').value.trim(),
+      billunit: document.getElementById('s_billunit').value.trim(),
+      hq:       document.getElementById('s_hq').value.trim(),
+      zone:     document.getElementById('s_zone').value.trim(),
+      dept:     document.getElementById('s_dept').value.trim(),
+      mob:      document.getElementById('s_mob').value.trim(),
+    };
+    localStorage.setItem(storageKeyFor('ta_settings', currentUserEmail), JSON.stringify(settings));
+    renderEmpBar();
+    refreshPreview();
+    renderRecords();
+    const chip = document.getElementById('savedChip');
+    chip.classList.add('show');
+    setTimeout(() => { chip.classList.remove('show'); setTimeout(closeSettings, 300); }, 900);
+  }
+  function renderEmpBar() {
+    const bar    = document.getElementById('empBar');
+    const hasAny = Object.values(settings).some(v => v);
+    if (!hasAny) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    const rate = getDailyRateForLevel(settings.level);
+    document.getElementById('eb_name').textContent     = settings.name     || '—';
+    document.getElementById('eb_empno').textContent    = settings.empno    || '—';
+    document.getElementById('eb_desig').textContent    = settings.desig    || '—';
+    document.getElementById('eb_doa').textContent      = settings.doa ? fmtDate(settings.doa) : '—';
+    document.getElementById('eb_level').textContent    = settings.level    || '—';
+    document.getElementById('eb_pay').textContent      = settings.pay ? 'Rs. ' + settings.pay : '—';
+    document.getElementById('eb_billunit').textContent = settings.billunit || '—';
+    document.getElementById('eb_hq').textContent       = settings.hq       || '—';
+    document.getElementById('eb_zone').textContent     = settings.zone     || '—';
+    document.getElementById('eb_dept').textContent     = settings.dept     || '—';
+    document.getElementById('eb_mob').textContent      = settings.mob      || '—';
+    document.getElementById('eb_taRate').textContent   = rate !== null ? `Rs. ${rate.toLocaleString()} /day` : '—';
+  }
+
+  /* ── ADD LEG ── */
+  function addLeg(data) {
+    legCounter++;
+    const idx       = legCounter;
+    const container = document.getElementById('legsContainer');
+    const count     = container.children.length + 1;
+    const div       = document.createElement('div');
+    div.className   = 'leg-card';
+    div.id          = `leg_${idx}`;
+    div.innerHTML   = `
+      <div class="leg-header">
+        <span class="leg-number">LEG ${count}</span>
+        <button class="leg-remove" onclick="removeLeg('leg_${idx}')" title="Remove this leg">✕</button>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:12px">
+        <div class="field">
+          <label>Date From</label>
+          <input type="date" id="df_${idx}" value="${data?.dateFrom||''}" oninput="onLegFieldChange(${idx})" />
+        </div>
+        <div class="field">
+          <label>Date To</label>
+          <input type="date" id="dt_${idx}" value="${data?.dateTo||''}" oninput="onLegFieldChange(${idx})" />
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:12px">
+        <label>Train Number</label>
+        <input type="text" id="train_${idx}" placeholder="e.g. EXP-402, KTM-17…"
+               value="${data?.trainNo||''}" oninput="updatePill(${idx})" />
+      </div>
+
+      <div class="journey-strip" style="margin-bottom:12px">
+        <div class="station-box">
+          <div class="stn-label">Station From</div>
+          <input type="text" id="sf_${idx}" placeholder="Departure station" value="${data?.stationFrom||''}" oninput="this.value=this.value.toUpperCase()" />
+        </div>
+        <div class="arrow-zone">
+          <div class="arrow-line">
+            <div class="dot"></div><div class="line"></div><div class="arrow-head">▶</div>
+          </div>
+          <div class="train-pill" id="pill_${idx}">${data?.trainNo||'TRAIN'}</div>
+        </div>
+        <div class="station-box">
+          <div class="stn-label">Station To</div>
+          <input type="text" id="st_${idx}" placeholder="Arrival station" value="${data?.stationTo||''}" oninput="this.value=this.value.toUpperCase()" />
+        </div>
+      </div>
+
+      <div class="times-row">
+        <div class="field">
+          <label>Time Left</label>
+          <input type="time" id="tl_${idx}" value="${data?.timeLeft||''}" onchange="onLegFieldChange(${idx})" />
+        </div>
+        <div class="field">
+          <label>Time Arrived</label>
+          <input type="time" id="ta_${idx}" value="${data?.timeArrived||''}" onchange="onLegFieldChange(${idx})" />
+        </div>
+        <div class="dur-cell">
+          <div class="dur-label">Duration</div>
+          <div class="dur-val" id="dur_${idx}">${data ? getDur(data.timeLeft, data.timeArrived) : '—'}</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+    renumberLegs();
+    refreshPreview();
+  }
+
+  function removeLeg(id) {
+    if (document.querySelectorAll('#legsContainer .leg-card').length === 1) {
+      alert('You need at least one journey leg.'); return;
+    }
+    document.getElementById(id)?.remove();
+    renumberLegs();
+    refreshPreview();
+  }
+  function renumberLegs() {
+    document.querySelectorAll('#legsContainer .leg-card .leg-number').forEach((el, i) => {
+      el.textContent = `LEG ${i + 1}`;
+    });
+  }
+
+  /* ── CONTINGENCY ALLOWANCE ── */
+  const CONTINGENCY_RATE = 15; // Rs. per KM
+  let contCounter = 0;
+
+  function calcContAmount(idx) {
+    const distEl = document.getElementById(`cd_${idx}`);
+    const amtEl  = document.getElementById(`camt_${idx}`);
+    const dist   = parseFloat(distEl?.value);
+    const amount = (!isNaN(dist) && dist >= 0) ? dist * CONTINGENCY_RATE : 0;
+    if (amtEl) amtEl.textContent = `Rs. ${amount.toFixed(2)}`;
+    updateContTotalBar();
+  }
+
+  function addContingency(data) {
+    contCounter++;
+    const idx       = contCounter;
+    const container = document.getElementById('contingencyContainer');
+    const count     = container.children.length + 1;
+    const div       = document.createElement('div');
+    div.className   = 'cont-card';
+    div.id          = `cont_${idx}`;
+    const presetAmount = data ? (parseFloat(data.distance) || 0) * CONTINGENCY_RATE : 0;
+    div.innerHTML   = `
+      <div class="cont-header">
+        <span class="cont-number">CA ${count}</span>
+        <button class="cont-remove" onclick="removeContingency('cont_${idx}')" title="Remove this entry">✕</button>
+      </div>
+      <div class="cont-grid">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="cdate_${idx}" value="${data?.date||''}" />
+        </div>
+        <div class="field">
+          <label>Address / Place Visited</label>
+          <input type="text" id="caddr_${idx}" placeholder="e.g. District Office, Sector 12" value="${data?.address||''}" />
+        </div>
+        <div class="field">
+          <label>Distance (KM)</label>
+          <input type="number" id="cd_${idx}" min="0" step="0.1" placeholder="0" value="${data?.distance||''}" oninput="calcContAmount(${idx})" />
+        </div>
+        <div class="cont-amount-cell">
+          <label>Amount</label>
+          <div class="cont-amount-val" id="camt_${idx}">Rs. ${presetAmount.toFixed(2)}</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+    renumberContingency();
+    updateContEmptyState();
+    updateContTotalBar();
+  }
+
+  function removeContingency(id) {
+    document.getElementById(id)?.remove();
+    renumberContingency();
+    updateContEmptyState();
+    updateContTotalBar();
+  }
+
+  function renumberContingency() {
+    document.querySelectorAll('#contingencyContainer .cont-card .cont-number').forEach((el, i) => {
+      el.textContent = `CA ${i + 1}`;
+    });
+  }
+
+  function updateContEmptyState() {
+    const has = document.querySelectorAll('#contingencyContainer .cont-card').length > 0;
+    document.getElementById('contEmptyState').style.display = has ? 'none' : 'block';
+  }
+
+  function getContingencyFormData() {
+    const cards = document.querySelectorAll('#contingencyContainer .cont-card');
+    const entries = [];
+    for (const card of cards) {
+      const id      = card.id.replace('cont_', '');
+      const date    = document.getElementById(`cdate_${id}`)?.value;
+      const address = document.getElementById(`caddr_${id}`)?.value.trim();
+      const distRaw = document.getElementById(`cd_${id}`)?.value;
+      const distance = parseFloat(distRaw);
+      entries.push({ date, address, distance: isNaN(distance) ? 0 : distance, hasInput: !!(date || address || distRaw) });
+    }
+    return entries;
+  }
+
+  function updateContTotalBar() {
+    const entries = getContingencyFormData();
+    const total = entries.reduce((s, e) => s + (e.distance * CONTINGENCY_RATE), 0);
+    const bar = document.getElementById('contTotalBar');
+    if (entries.length) {
+      bar.style.display = 'flex';
+      document.getElementById('contTotalVal').textContent = `Rs. ${total.toFixed(2)}`;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
+  /* ── COLLECT FORM ── */
+  function collectForm() {
+    const object  = document.getElementById('objectInput').value.trim();
+    if (!object) { alert('Please enter the Object of Journey.'); document.getElementById('objectInput').focus(); return null; }
+
+    const legCards = document.querySelectorAll('#legsContainer .leg-card');
+    if (!legCards.length) { alert('Please add at least one journey leg.'); return null; }
+
+    const legs = [];
+    for (const card of legCards) {
+      const id          = card.id.replace('leg_', '');
+      const trainNo     = document.getElementById(`train_${id}`)?.value.trim();
+      const stationFrom = document.getElementById(`sf_${id}`)?.value.trim();
+      const stationTo   = document.getElementById(`st_${id}`)?.value.trim();
+      const timeLeft    = document.getElementById(`tl_${id}`)?.value;
+      const timeArrived = document.getElementById(`ta_${id}`)?.value;
+      const dateFrom    = document.getElementById(`df_${id}`)?.value;
+      const dateTo      = document.getElementById(`dt_${id}`)?.value;
+      if (!trainNo || !stationFrom || !stationTo || !timeLeft || !timeArrived || !dateFrom) {
+        alert('Please complete all fields in every leg (Train No., Stations, Date From, Times).'); return null;
+      }
+      legs.push({ trainNo, stationFrom, stationTo, timeLeft, timeArrived, dateFrom, dateTo });
+    }
+
+    const contRaw = getContingencyFormData();
+    const contingency = [];
+    for (const e of contRaw) {
+      if (!e.hasInput) continue; // skip fully-blank rows
+      if (!e.date || !e.address || !e.distance || e.distance <= 0) {
+        alert('Please complete every Contingent Charge entry (Date, Address, and Distance), or remove the empty one.');
+        return null;
+      }
+      contingency.push({ date: e.date, address: e.address, distance: e.distance, amount: e.distance * CONTINGENCY_RATE });
+    }
+
+    return { object, legs, contingency };
+  }
+
+  /* ── SAVE / UPDATE ── */
+  function saveRecord() {
+    const data = collectForm();
+    if (!data) return;
+    const taBreakdown = computeBreakdown(data.legs);
+    if (editingId !== null) {
+      const idx = records.findIndex(r => r.id === editingId);
+      if (idx > -1) records[idx] = { ...records[idx], ...data, taBreakdown, updatedAt: new Date().toISOString() };
+    } else {
+      records.push({ id: Date.now(), ...data, taBreakdown, createdAt: new Date().toISOString() });
+    }
+    save(); renderRecords(); resetForm();
+  }
+
+  /* ── EDIT ── */
+  function editRecord(id) {
+    const rec = records.find(r => r.id === id);
+    if (!rec) return;
+    editingId = id;
+    document.getElementById('objectInput').value  = rec.object;
+    document.getElementById('legsContainer').innerHTML = '';
+    legCounter = 0;
+    rec.legs.forEach(leg => addLeg(leg));
+    document.getElementById('contingencyContainer').innerHTML = '';
+    contCounter = 0;
+    (rec.contingency || []).forEach(c => addContingency(c));
+    updateContEmptyState();
+    updateContTotalBar();
+    document.getElementById('formTitle').textContent = '✏️ Edit TA Entry';
+    document.getElementById('saveBtn').textContent   = '💾 Update TA Record';
+    document.getElementById('editBanner').classList.remove('hidden');
+    document.querySelectorAll('.record-block').forEach(b => b.classList.remove('editing-highlight'));
+    document.getElementById(`rec_${id}`)?.classList.add('editing-highlight');
+    document.querySelector('.card.no-print').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function cancelEdit() { resetForm(); }
+
+  function resetForm() {
+    document.getElementById('objectInput').value  = '';
+    document.getElementById('legsContainer').innerHTML = '';
+    legCounter = 0;
+    addLeg();
+    document.getElementById('contingencyContainer').innerHTML = '';
+    contCounter = 0;
+    updateContEmptyState();
+    updateContTotalBar();
+    document.getElementById('formTitle').textContent = '✏️ New TA Entry';
+    document.getElementById('saveBtn').textContent   = '💾 Save TA Record';
+    document.getElementById('editBanner').classList.add('hidden');
+    document.querySelectorAll('.record-block').forEach(b => b.classList.remove('editing-highlight'));
+    editingId = null;
+  }
+
+  function clearForm() {
+    if (editingId !== null) { cancelEdit(); return; }
+    resetForm();
+  }
+
+  /* ── DELETE ── */
+  function deleteRecord(id) {
+    if (!confirm('Delete this TA record? This cannot be undone.')) return;
+    records = records.filter(r => r.id !== id);
+    if (editingId === id) resetForm();
+    save(); renderRecords();
+  }
+
+  function save() { localStorage.setItem(storageKeyFor('ta_records_v2', currentUserEmail), JSON.stringify(records)); }
+
+  /* ── RENDER RECORDS ── */
+  function renderRecords() {
+    const container = document.getElementById('recordsContainer');
+    const noteEl = document.getElementById('monthFilterNote');
+
+    // Filter note above the list
+    if (selectedMonth === 'ALL') {
+      noteEl.innerHTML = records.length
+        ? `📅 Showing <strong>all months</strong> &nbsp;·&nbsp; <button class="clear-month-btn" onclick="changeMonth(0)">Back to ${monthLabel(currentYYYYMM())}</button>`
+        : '';
+    } else {
+      noteEl.innerHTML = `📅 Showing records for <strong>${monthLabel(selectedMonth)}</strong> &nbsp;·&nbsp; <button class="clear-month-btn" onclick="showAllMonths()">Show All Months</button>`;
+    }
+
+    if (!records.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🚉</div><p>No records yet. Fill in the form above and click <strong>Save TA Record</strong>.</p></div>`;
+      return;
+    }
+
+    const monthRecords = getMonthRecords();
+    if (!monthRecords.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🗓️</div><p>No TA records for <strong>${monthLabel(selectedMonth)}</strong>.<br>Use the arrows above to browse other months, or <button class="clear-month-btn" style="margin-top:8px" onclick="showAllMonths()">Show All Months</button></p></div>`;
+      return;
+    }
+
+    container.innerHTML = '';
+    monthRecords.forEach(rec => {
+      const firstDate = rec.legs[0]?.dateFrom;
+      const lastDate  = rec.legs[rec.legs.length-1]?.dateTo || rec.legs[rec.legs.length-1]?.dateFrom;
+      const breakdown = rec.taBreakdown || computeBreakdown(rec.legs);
+      const block = document.createElement('div');
+      block.className = 'record-block';
+      block.id = `rec_${rec.id}`;
+      block.innerHTML = `
+        <div class="record-head">
+          <div style="flex:1;min-width:0">
+            <div class="record-object">📌 ${rec.object}</div>
+            <div class="record-meta">
+              ${fmtDate(firstDate)}${lastDate && lastDate !== firstDate ? ' → ' + fmtDate(lastDate) : ''}
+              &nbsp;·&nbsp; ${rec.legs.length} leg${rec.legs.length > 1 ? 's' : ''}
+              ${rec.updatedAt ? '&nbsp;·&nbsp; <em style="color:var(--gold);font-style:normal">edited</em>' : ''}
+            </div>
+          </div>
+          <div class="record-actions no-print">
+            <button class="rec-btn edit" onclick="editRecord(${rec.id})">✏️ Edit</button>
+            <button class="rec-btn del"  onclick="deleteRecord(${rec.id})">✕ Delete</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Leg</th><th>Date From</th><th>Date To</th><th>Train No.</th>
+                <th>Route</th><th>Time Left</th><th>Time Arrived</th><th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rec.legs.map((leg, li) => `
+                <tr>
+                  <td style="font-weight:800;font-size:11px;color:var(--muted)">LEG ${li+1}</td>
+                  <td>${fmtDate(leg.dateFrom)}</td>
+                  <td>${fmtDate(leg.dateTo)}</td>
+                  <td><strong>${leg.trainNo}</strong></td>
+                  <td><span class="badge-route">${leg.stationFrom} → ${leg.stationTo}</span></td>
+                  <td>${fmt12(leg.timeLeft)}</td>
+                  <td>${fmt12(leg.timeArrived)}</td>
+                  <td style="font-weight:700;color:var(--navy)">${getDur(leg.timeLeft, leg.timeArrived)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="rec-details-toggle no-print">
+          <button class="rec-details-btn" onclick="toggleRecDetails(${rec.id}, this)">
+            📊 Show Details
+          </button>
+        </div>
+        <div class="rec-details-panel" id="recDetails_${rec.id}" style="display:none">
+          <div class="ta-box in-record">
+            <div class="ta-box-head" style="padding-top:14px;padding-left:16px;padding-right:16px">
+              <span class="ta-icon">📊</span>
+              <span class="ta-title">TA Entitlement</span>
+            </div>
+            <div style="padding:0 16px 14px" id="taBlock_${rec.id}"></div>
+          </div>
+          ${(rec.contingency && rec.contingency.length) ? `
+          <div class="ta-box in-record">
+            <div class="ta-box-head" style="padding-top:14px;padding-left:16px;padding-right:16px">
+              <span class="ta-icon">🧾</span>
+              <span class="ta-title">Contingent Charge</span>
+            </div>
+            <div style="padding:0 16px 14px">
+              <div class="ta-table-wrap">
+                <table class="ta-table cont-table">
+                  <thead>
+                    <tr><th>Date</th><th>Address / Place Visited</th><th>Distance (KM)</th><th>Amount</th></tr>
+                  </thead>
+                  <tbody>
+                    ${rec.contingency.map(c => `
+                      <tr>
+                        <td>${fmtDate(c.date)}</td>
+                        <td>${c.address}</td>
+                        <td>${c.distance} km</td>
+                        <td style="font-weight:700;color:#0F766E">Rs. ${c.amount.toFixed(2)}</td>
+                      </tr>
+                    `).join('')}
+                    <tr class="cont-total-row">
+                      <td colspan="3">${rec.contingency.length} entr${rec.contingency.length>1?'ies':'y'} total</td>
+                      <td>Rs. ${rec.contingency.reduce((s,c)=>s+c.amount,0).toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>` : ''}
+        </div>
+      `;
+      container.appendChild(block);
+      // TA panel renders lazily when user clicks "Show Details"
+    });
+  }
+
+
+  function toggleRecDetails(id, btn) {
+    const panel = document.getElementById(`recDetails_${id}`);
+    if (!panel) return;
+    const isHidden = panel.style.display === 'none';
+    panel.style.display = isHidden ? 'block' : 'none';
+    btn.textContent = isHidden ? '📊 Hide Details' : '📊 Show Details';
+    // Lazy-render the TA panel on first open
+    if (isHidden) {
+      const rec = records.find(r => r.id === id);
+      if (rec) {
+        const adjustedMap = getAllAdjustedBreakdowns(records);
+        const breakdown = adjustedMap.get(rec.id) || rec.taBreakdown || computeBreakdown(rec.legs);
+        renderTAPanel(breakdown, `taBlock_${id}`);
+      }
+    }
+  }
+
+
+  function openExportModal() {
+    const mr = getMonthRecords();
+    document.getElementById('exportModalSub').textContent =
+      mr.length ? `${mr.length} record(s) — ${monthLabel(selectedMonth)}` : 'No records for current month';
+    document.getElementById('exportProgress').style.display = 'none';
+    document.getElementById('exportModal').classList.add('active');
+  }
+  function closeExportModal() {
+    document.getElementById('exportModal').classList.remove('active');
+  }
+  document.getElementById('exportModal').addEventListener('click', function(e) {
+    if (e.target === this) closeExportModal();
+  });
+
+  /* ── SHARED HELPERS ── */
+  function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmtDateShort(d) {
+    if (!d) return '';
+    const [y,mo,day] = d.split('-');
+    return `${day}/${mo}/${String(y).slice(2)}`;
+  }
+  function fmt24(t) { return t || '-'; }
+  function paise(v) { return String(Math.round((Math.abs(v) % 1) * 100)).padStart(2,'0'); }
+  function toWords(n) {
+    if (!n || isNaN(n)) return 'Zero';
+    const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+    const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    const conv = x => {
+      if (x <= 0) return '';
+      if (x < 20) return a[x];
+      if (x < 100) return b[Math.floor(x/10)] + (x%10 ? ' '+a[x%10] : '');
+      return a[Math.floor(x/100)]+' Hundred'+(x%100?' '+conv(x%100):'');
+    };
+    const w = Math.round(n);
+    let r = '';
+    if (w >= 100000) r += conv(Math.floor(w/100000))+' Lakh ';
+    if (w%100000 >= 1000) r += conv(Math.floor((w%100000)/1000))+' Thousand ';
+    if (w%1000 >= 100) r += conv(Math.floor((w%1000)/100))+' Hundred ';
+    r += conv(w%100);
+    return r.trim() || 'Zero';
+  }
+
+  /* ── COMPUTE RECORD DATA ── */
+  function calcRecordData(rec) {
+    const rate = getDailyRateForLevel(settings.level);
+    const hasRate = rate !== null;
+    const adjustedMap = getAllAdjustedBreakdowns(records);
+    const breakdown = adjustedMap.get(rec.id) || rec.taBreakdown || computeBreakdown(rec.legs);
+    const conts = rec.contingency || [];
+    let taTotal = 0;
+    const dayMap = {};
+    (breakdown||[]).forEach(seg => {
+      if (seg.carriedForward) {
+        // Hours were absorbed into the next TA record's entry for this date —
+        // leave this date blank here (no %, no amount).
+        dayMap[seg.date] = { pct: null, amt: 0, carriedForward: true };
+        return;
+      }
+      const amt = hasRate ? rate * seg.pct / 100 : 0;
+      taTotal += amt;
+      dayMap[seg.date] = { pct: seg.pct, amt };
+    });
+    const contTotal = conts.reduce((s,c) => s + c.amount, 0);
+    const grand = taTotal + contTotal;
+    const grandR = Math.round(grand);
+    const tier = { 30:0, 70:0, 100:0 };
+    Object.values(dayMap).forEach(d => { if (tier[d.pct] !== undefined) tier[d.pct]++; });
+    // Build rows
+    const shownDates = new Set();
+    const arrivals = {};
+    const rows = [];
+    // First pass: count how many rows each date will have (for rowspan)
+    const dateRowCount = {};
+    rec.legs.forEach(leg => {
+      const df = leg.dateFrom;
+      const dt = (leg.dateTo && leg.dateTo !== leg.dateFrom) ? leg.dateTo : null;
+      dateRowCount[df] = (dateRowCount[df] || 0) + 1;
+      if (dt) dateRowCount[dt] = (dateRowCount[dt] || 0) + 1;
+    });
+    // Track which dates have had their pct/amount cell rendered
+    const pctRendered = new Set();
+
+    rec.legs.forEach(leg => {
+      const df = leg.dateFrom;
+      const dt = (leg.dateTo && leg.dateTo !== leg.dateFrom) ? leg.dateTo : null;
+      const isNew = !shownDates.has(df);
+      if (isNew) shownDates.add(df);
+      const dayI = dayMap[df];
+      const showPct = !pctRendered.has(df) && dayI;
+      if (showPct) pctRendered.add(df);
+      rows.push({ dateLabel: isNew ? fmtDateShort(df) : ',,', isNewDate: isNew,
+        trainNo: leg.trainNo,
+        timeLeft:    fmt24(leg.timeLeft),
+        timeArrived: dt ? '' : fmt24(leg.timeArrived),
+        stFrom: leg.stationFrom,
+        stTo:   dt ? '' : leg.stationTo,
+        showPct,
+        pctSpan: showPct ? dateRowCount[df] : 0,
+        pct:   showPct ? (dayI.carriedForward ? '' : dayI.pct + '%') : null,
+        amtRs: showPct && hasRate && !dayI.carriedForward ? Math.floor(dayI.amt) : null,
+        amtP:  showPct && hasRate && !dayI.carriedForward ? paise(dayI.amt) : null,
+      });
+      if (dt) { if (!arrivals[dt]) arrivals[dt] = []; arrivals[dt].push(leg); }
+    });
+    Object.keys(arrivals).sort().forEach(dt => {
+      const isNew = !shownDates.has(dt); if (isNew) shownDates.add(dt);
+      const dayI = dayMap[dt];
+      arrivals[dt].forEach((leg, idx) => {
+        const showPct = !pctRendered.has(dt) && idx === 0 && dayI;
+        if (showPct) pctRendered.add(dt);
+        rows.push({ dateLabel: isNew && idx===0 ? fmtDateShort(dt) : ',,', isNewDate: isNew&&idx===0,
+          trainNo: ',,',
+          timeLeft:    '',
+          timeArrived: fmt24(leg.timeArrived),
+          stFrom: '',
+          stTo:   leg.stationTo,
+          showPct,
+          pctSpan: showPct ? dateRowCount[dt] : 0,
+          pct:   showPct ? (dayI.carriedForward ? '' : dayI.pct+'%') : null,
+          amtRs: showPct && hasRate && !dayI.carriedForward ? Math.floor(dayI.amt) : null,
+          amtP:  showPct && hasRate && !dayI.carriedForward ? paise(dayI.amt) : null,
+        });
+      });
+    });
+
+    // Add intermediate "stay" rows for days that have TA entitlement but no leg or arrival row
+    // (e.g. employee away for 3 nights — those dates appear in dayMap but not in shownDates)
+    const allBreakdownDates = (breakdown||[]).map(seg => seg.date).sort();
+    allBreakdownDates.forEach(date => {
+      if (shownDates.has(date)) return; // already shown via leg or arrival
+      shownDates.add(date);
+      const dayI = dayMap[date];
+      if (!dayI) return;
+      dateRowCount[date] = (dateRowCount[date] || 1);
+      rows.push({
+        dateLabel: fmtDateShort(date), isNewDate: true,
+        trainNo: '', timeLeft: '', timeArrived: '',
+        stFrom: '', stTo: '',
+        showPct: true,
+        pctSpan: 1,
+        pct:   dayI.carriedForward ? '' : dayI.pct + '%',
+        amtRs: hasRate && !dayI.carriedForward ? Math.floor(dayI.amt) : null,
+        amtP:  hasRate && !dayI.carriedForward ? paise(dayI.amt) : null,
+        isStayDay: true,
+      });
+    });
+
+    // Sort all rows by date so stay-day rows appear in correct calendar order
+    rows.sort((a, b) => {
+      // Convert DD/MM/YY back to sortable YYYYMMDD
+      const toSort = d => {
+        if (!d || d === ',,') return '';
+        const [day, mo, yr] = d.split('/');
+        return `20${yr}${mo}${day}`;
+      };
+      const da = toSort(a.dateLabel);
+      const db = toSort(b.dateLabel);
+      if (da && db && da !== db) return da < db ? -1 : 1;
+      return 0;
+    });
+
+    return { rate, hasRate, dayMap, taTotal, contTotal, grand, grandR, tier, rows, conts };
+  }
+
+  /* ════════════════════════════════════════
+     PRINT — all TAs on one page, one summary at end
+  ════════════════════════════════════════ */
+  function doPrint() {
+    const mr = getMonthRecords();
+    if (!mr.length) { alert('No records to print for ' + monthLabel(selectedMonth) + '.'); return; }
+    const s = settings;
+    const [moName, moYear] = monthLabel(selectedMonth).split(' ');
+
+    // ── Aggregate totals across all records ──
+    let grandTaTotal = 0, grandContTotal = 0;
+    const aggTier = { 30:0, 70:0, 100:0 };
+    const allConts = [];
+    const allData = mr.map(rec => {
+      const d = calcRecordData(rec);
+      grandTaTotal  += d.taTotal;
+      grandContTotal += d.contTotal;
+      aggTier[30]  += d.tier[30];
+      aggTier[70]  += d.tier[70];
+      aggTier[100] += d.tier[100];
+      d.conts.forEach(c => allConts.push(c));
+      return { rec, d };
+    });
+    const grandTotal  = grandTaTotal + grandContTotal;
+    const grandRTotal = Math.round(grandTotal);
+    const rate = getDailyRateForLevel(s.level);
+    const hasRate = rate !== null;
+
+    // ── PAGE 1: Header once, then all TA tables stacked ──
+    let journalRows = '';
+    allData.forEach(({ rec, d }, idx) => {
+
+      /* TABLE BODY ROWS — object merged by total rows, pct/amount merged per date */
+      const journeyRowCount = d.rows.length;
+      const tRows = d.rows.map((r, ri) => {
+        const objCell = ri === 0
+          ? `<td rowspan="${journeyRowCount}" style="text-align:left;padding-left:1.5mm;font-size:8pt;vertical-align:middle">${escH(rec.object)}</td>`
+          : '';
+        // pct and amount: render with rowspan when showPct, skip when not
+        const pctCell = r.showPct
+          ? `<td rowspan="${r.pctSpan}" style="text-align:center;vertical-align:middle;font-weight:bold">${r.pct}</td>`
+          : (r.pct === null ? '' : `<td>${r.pct}</td>`);
+        const amtRsCell = r.showPct
+          ? `<td rowspan="${r.pctSpan}" style="text-align:right;vertical-align:middle;font-weight:bold">${r.amtRs !== null ? r.amtRs : ''}</td>`
+          : (r.amtRs === null ? '' : `<td style="text-align:right">${r.amtRs}</td>`);
+        const amtPCell = r.showPct
+          ? `<td rowspan="${r.pctSpan}" style="vertical-align:middle;font-weight:bold">${r.amtP !== null ? r.amtP : ''}</td>`
+          : (r.amtP === null ? '' : `<td>${r.amtP}</td>`);
+        return `
+          <tr${r.isStayDay ? ' style="font-style:normal"' : ''}>
+            <td style="text-align:left;padding-left:1.5mm">${r.isNewDate ? '<b>'+r.dateLabel+'</b>' : r.dateLabel}</td>
+            <td>${r.isStayDay ? '' : escH(r.trainNo)}</td>
+            <td>${r.isStayDay ? '' : r.timeLeft}</td>
+            <td>${r.isStayDay ? '' : r.timeArrived}</td>
+            <td>${r.isStayDay ? '' : escH(r.stFrom)}</td>
+            <td>${r.isStayDay ? '' : escH(r.stTo)}</td>
+            ${pctCell}
+            ${objCell}
+            ${amtRsCell}
+            ${amtPCell}
+          </tr>`;
+      }).join('');
+
+      journalRows += tRows;
+    });
+
+    // Contingent plain text (all records) — below table
+    const cText = allConts.length ? `<div class="pj-cont-blk"><b>Contingent Charge:-</b><br>
+      ${allConts.map(c => `${fmtDateShort(c.date)} &nbsp;${escH(c.address)} 15X${c.distance}km = ${Math.floor(c.amount)}`).join('<br>')}
+    </div>` : '';
+
+    // Grand totals block — right aligned below table
+    const totals = `<div class="pj-tot-wrap"><table class="pj-tot">
+      ${allConts.length ? `<tr><td class="tl">Contingent</td><td class="tr">${Math.floor(grandContTotal)}</td><td class="tp">00</td></tr>` : ''}
+      <tr class="tr-grand"><td class="tl"><b>Grand Total</b></td><td class="tr">${Math.floor(grandTotal)}</td><td class="tp">${allConts.length?'00':paise(grandTotal)}</td></tr>
+    </table></div>`;
+
+    const html = `
+    <div class="print-page" style="page-break-after:auto">
+
+      <!-- TOP: mob | Zone | blank -->
+      <table class="pj-top"><tr>
+        <td class="t-left">Mob. ${escH(s.mob||'')}</td>
+        <td class="t-mid">${escH(s.zone||s.hq||'Northern Railway')}</td>
+        <td class="t-right"></td>
+      </tr></table>
+
+      <div class="pj-title">Travelling Allowance Journal</div>
+
+      <!-- EMPLOYEE HEADER — single flowing paragraph, wraps like the PDF -->
+      <div class="pj-info">
+        Dept. <span class="pj-uv">${escH(s.dept||'')}</span>
+        &nbsp;&nbsp;PF NO. <span class="pj-uv">${escH(s.empno||'')}</span>
+        &nbsp;&nbsp;Bill Unit No. <span class="pj-uv">${escH(s.billunit||'')}</span>
+        &nbsp;&nbsp;Headquarters <span class="pj-uv">${escH(s.hq||'')}</span>
+        &nbsp;&nbsp;Journal of duties performed by
+        Sh.&nbsp;<span class="pj-uv">${escH(s.name||'')}</span>
+        &nbsp;for which allowance for&nbsp;<b>${moName.toUpperCase()}</b>&nbsp;month year&nbsp;<b>${moYear}</b>&nbsp;is claimed.
+        Designation&nbsp;<span class="pj-uv">${escH(s.desig||s.level||'')}</span>.
+        &nbsp;Pay&nbsp;<span class="pj-uv">${escH(s.pay||'')}/-</span>
+        &nbsp;in&nbsp;<span class="pj-uv">${escH(s.level||'')}</span>&nbsp;of 7th CPC.
+        &nbsp;Date of Appointment&nbsp;<span class="pj-uv">${s.doa?fmtDateShort(s.doa):''}</span>.
+        &nbsp;Rules by which governed&nbsp;<span class="pj-uv">NPS</span>.
+      </div>
+
+      <!-- SINGLE COMBINED TABLE FOR ALL TAs -->
+      <table class="pj-table">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:11%">Month<br>&amp; Date</th>
+            <th rowspan="2" style="width:8%">Train<br>no.</th>
+            <th rowspan="2" style="width:7%">Time<br>left</th>
+            <th rowspan="2" style="width:7%">Time<br>arrived</th>
+            <th colspan="2" style="width:12%">Station</th>
+            <th rowspan="2" style="width:9%">KM/ %<br>Day<br>Night</th>
+            <th rowspan="2" style="width:28%">Object of Journey</th>
+            <th colspan="2" style="width:11%">Rate</th>
+          </tr>
+          <tr>
+            <th style="width:6%">from</th>
+            <th style="width:6%">to</th>
+            <th style="width:7%">Rs.</th>
+            <th style="width:4%">P.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${journalRows}
+          <tr class="pj-grand-total-row">
+            <td colspan="8" style="text-align:right;font-weight:bold">Total</td>
+            <td style="text-align:right;font-weight:bold">${Math.floor(grandTaTotal)}</td>
+            <td style="font-weight:bold">${paise(grandTaTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      ${cText}
+      ${totals}
+
+      <!-- SUMMARY BLOCK: stays together, moves to new page if TA content is long -->
+      <div class="pj-summary-block">
+      <div class="pj-p2-title" style="margin-top:6mm"></div>
+      <table class="pj-sum-tbl">
+        <thead>
+          <tr><th colspan="3" style="text-align:center;font-size:11pt;padding:2mm">Summary</th></tr>
+          <tr><th>Percentage</th><th>No. of total days</th><th>Rate of TA &times; Days=Amount</th></tr>
+        </thead>
+        <tbody>
+          ${[30,70,100].map(p => {
+            const amt = hasRate ? rate * p/100 : 0;
+            return `<tr>
+              <td style="text-align:center">${p}%</td>
+              <td style="text-align:center">${aggTier[p]}</td>
+              <td>${(() => {
+                if (!hasRate) return '—';
+                const exact = amt * aggTier[p];
+                const rounded = Math.round(exact);
+                const needsBracket = exact !== rounded;
+                return `Rs. ${amt.toFixed(1)} X ${aggTier[p]}= Rs. ${exact.toFixed(2)}/-${needsBracket ? '('+rounded+')' : ''}`;
+              })()}</td>
+            </tr>`;
+          }).join('')}
+          <tr><td colspan="2"><b>Total Contingent Amount:- Rs. =</b></td><td><b>${Math.round(grandContTotal)}</b></td></tr>
+          <tr class="pj-sum-grand"><td colspan="2"><b>Total Amount</b></td>
+            <td><b>Rs. ${grandRTotal}/- ( Rs. ${toWords(grandRTotal)} Rupees Only. )</b></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="pj-cert">
+        <p>It is certified that:-</p>
+        <p>1.&nbsp;The T.A claimed by me has not been claimed before and will not be claimed hereafter.</p>
+        <p>2.&nbsp;Conveyance charges claimed have actually been spent by me and according to local municipal rates.</p>
+        <p>3.&nbsp;Cheapest mode of conveyance was utilized.</p>
+        <p>4.&nbsp;The journey performed by road for which conveyance has been claimed was over 1.6km.</p>
+      </div>
+      <div class="pj-sig-r">
+        …………………………………………………………………………………<br>
+        Signature of Officer Claiming T.A.
+      </div>
+      <div class="pj-counter-para">
+        I hereby certify that was Sh. <b>${escH(s.name||'')}</b> absent on duty from his headquarter station during
+        the period charged for in the bill on Railway business and that the officer performed the journey by
+        Rail/Sea/Air/Road and was allowed/not allowed free Pass of locomotion at the expense of Government local
+        fund of Indian State.
+      </div>
+      <table class="pj-sig-lr"><tr>
+        <td class="srl">Countersigned</td>
+        <td class="srr">…………………………………………………………………………………<br>
+          Signature of Head of the Office<br>Controlling Officer</td>
+      </tr></table>
+      </div><!-- end pj-summary-block -->
+    </div>`;
+
+    document.getElementById('printJournal').innerHTML = html;
+    closeExportModal();
+
+    // Two-page model: measure rendered TA section height.
+    // A4 at 96dpi ≈ 1122px tall; with 10mm top/bottom padding (~38px each) = ~1046px usable.
+    // If the TA content (everything before the summary block) is taller than ~60% of a page,
+    // force the summary to start on a new page.
+    setTimeout(() => {
+      const page = document.querySelector('#printJournal .print-page');
+      const summaryBlock = document.querySelector('#printJournal .pj-summary-block');
+      if (page && summaryBlock) {
+        const pageRect    = page.getBoundingClientRect();
+        const summaryRect = summaryBlock.getBoundingClientRect();
+        const taContentHeight = summaryRect.top - pageRect.top; // height of everything above summary
+        const a4UsableHeight  = 1046; // ~A4 usable at 96dpi
+        if (taContentHeight > a4UsableHeight * 0.55) {
+          summaryBlock.style.pageBreakBefore = 'always';
+          summaryBlock.style.breakBefore = 'page';
+        } else {
+          summaryBlock.style.pageBreakBefore = '';
+          summaryBlock.style.breakBefore = '';
+        }
+      }
+      window.print();
+    }, 300);
+  }
+
+  /* ════════════════════════════════════════
+     WORD EXPORT — real .docx via raw XML+ZIP
+  ════════════════════════════════════════ */
+  async function doWordExport() {
+    const mr = getMonthRecords();
+    if (!mr.length) { alert('No records for ' + monthLabel(selectedMonth) + '.'); return; }
+    const prog = document.getElementById('exportProgress');
+    prog.textContent = '⏳ Generating Word document…';
+    prog.style.display = 'block';
+
+    const s = settings;
+    const [moName, moYear] = monthLabel(selectedMonth).split(' ');
+
+    // Build document.xml paragraphs
+    let bodyXml = '';
+
+    const W = (tag, attrs, inner) => {
+      const a = attrs ? ' ' + Object.entries(attrs).map(([k,v])=>`w:${k}="${v}"`).join(' ') : '';
+      return `<w:${tag}${a}>${inner||''}</w:${tag}>`;
+    };
+    const rpr = (bold, sz) => `<w:rPr>${bold?'<w:b/>':''}${sz?`<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>`:''}</w:rPr>`;
+    const run = (text, bold, sz, uline) =>
+      `<w:r>${rpr(bold,sz)}${uline?'<w:u w:val="single"/>':''}<w:t xml:space="preserve">${escXml(text)}</w:t></w:r>`;
+    const para = (runs, align, spAfter) => {
+      const ppr = `<w:pPr>${align?`<w:jc w:val="${align}"/>`:''}${spAfter!==undefined?`<w:spacing w:after="${spAfter}"/>`:'<w:spacing w:after="60"/>'}</w:pPr>`;
+      return `<w:p>${ppr}${runs}</w:p>`;
+    };
+    const escXml = t => String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    // Table cell helper — colSpan, bold, align, shading
+    const tc = (text, opts={}) => {
+      const {span=1, bold=false, sz=18, align='center', shade=false, vMerge=false, vMergeRestart=false} = opts;
+      const tcPr = `<w:tcPr>
+        ${span>1?`<w:gridSpan w:val="${span}"/>`:''}
+        ${shade?`<w:shd w:val="clear" w:color="auto" w:fill="EEEEEE"/>`:''}
+        ${vMergeRestart?'<w:vMerge w:val="restart"/>':vMerge?'<w:vMerge/>':''}
+        <w:tcBorders>
+          <w:top w:val="single" w:sz="4" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:color="000000"/>
+        </w:tcBorders>
+      </w:tcPr>`;
+      const ppr = `<w:pPr><w:jc w:val="${align}"/><w:spacing w:after="0"/></w:pPr>`;
+      return `<w:tc>${tcPr}<w:p>${ppr}<w:r>${rpr(bold,sz)}<w:t xml:space="preserve">${escXml(text)}</w:t></w:r></w:p></w:tc>`;
+    };
+
+    mr.forEach(rec => {
+      const d = calcRecordData(rec);
+
+      // PAGE 1
+      bodyXml += para(run(`Mob. ${s.mob||''}`, false, 18) + run(`          ${s.zone||s.hq||'Northern Railway'}`, true, 22), 'left', 0);
+      bodyXml += para(run('Travelling Allowance Journal', true, 24), 'center', 60);
+      bodyXml += para(
+        run('Dept. ', false, 18) + run(s.dept||'', true, 18) +
+        run('  PF NO. ', false, 18) + run(s.empno||'', true, 18) +
+        run('  Bill Unit No. ', false, 18) + run(s.billunit||'', true, 18) +
+        run('  Headquarters ', false, 18) + run(s.hq||'', true, 18),
+        'left', 30);
+      bodyXml += para(
+        run('Journal of duties performed by Sh. ', false, 18) + run(s.name||'', true, 18) +
+        run(` for which allowance for ${moName.toUpperCase()} month year ${moYear} is claimed. Designation `, false, 18) +
+        run(s.desig||s.level||'', true, 18) +
+        run(`. Pay `, false, 18) + run(`${s.pay||''}/-`, true, 18) +
+        run(` in `, false, 18) + run(s.level||'', true, 18) +
+        run(` of 7th CPC. Date of Appointment `, false, 18) +
+        run(s.doa?fmtDateShort(s.doa):'', true, 18) +
+        run('. Rules by which governed ', false, 18) + run('NPS', true, 18) + run('.', false, 18),
+        'left', 60);
+
+      // MAIN TA TABLE - header row 1
+      const tblW = 9200; // twips, fits in A4 with margins
+      const colW = [900, 650, 600, 600, 500, 500, 750, 2500, 600, 400]; // must sum ≈ tblW
+      const tblPr = `<w:tblPr>
+        <w:tblW w:w="${tblW}" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:color="000000"/>
+        </w:tblBorders>
+        <w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="60" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar>
+      </w:tblPr>`;
+      const gridCols = colW.map(w=>`<w:gridCol w:w="${w}"/>`).join('');
+
+      const hdr1 = [
+        tc('Month\n& Date', {bold:true, sz:16, vMergeRestart:true}),
+        tc('Train no.', {bold:true, sz:16, vMergeRestart:true}),
+        tc('Time left', {bold:true, sz:16, vMergeRestart:true}),
+        tc('Time arrived', {bold:true, sz:16, vMergeRestart:true}),
+        tc('Station', {bold:true, sz:16, span:2}),
+        tc('KM/ %\nDay Night', {bold:true, sz:16, vMergeRestart:true}),
+        tc('Object of Journey', {bold:true, sz:16, vMergeRestart:true}),
+        tc('Rate from', {bold:true, sz:16, span:2}),
+      ].join('');
+      const hdr2 = [
+        tc('', {vMerge:true}), tc('', {vMerge:true}), tc('', {vMerge:true}), tc('', {vMerge:true}),
+        tc('from', {bold:true, sz:16}), tc('to', {bold:true, sz:16}),
+        tc('', {vMerge:true}), tc('', {vMerge:true}),
+        tc('Rs.', {bold:true, sz:16}), tc('P.', {bold:true, sz:16}),
+      ].join('');
+
+      const dataRows = d.rows.map((r, ri) =>
+        [tc(r.dateLabel, {sz:16, align:'left', bold:r.isNewDate}),
+         tc(r.trainNo, {sz:16}),
+         tc(r.timeLeft, {sz:16}),
+         tc(r.timeArrived, {sz:16}),
+         tc(r.stFrom, {sz:16}),
+         tc(r.stTo, {sz:16}),
+         tc(r.pct, {sz:16}),
+         ri === 0
+           ? tc(rec.object, {sz:16, align:'left', vMergeRestart:true})
+           : tc('', {sz:16, align:'left', vMerge:true}),
+         tc(String(r.amtRs), {sz:16, align:'right'}),
+         tc(String(r.amtP), {sz:16}),
+        ].join('')
+      ).join('</w:tr><w:tr>');
+
+      const cRows2 = d.conts.map(c =>
+        [tc(fmtDateShort(c.date), {sz:16, align:'left', bold:true}),
+         tc(c.address, {sz:16, align:'left', span:5}),
+         tc(`15x${c.distance}km`, {sz:14}),
+         tc('', {sz:16}),
+         tc(String(Math.floor(c.amount)), {sz:16, align:'right'}),
+         tc('00', {sz:16}),
+        ].join('')
+      ).join('</w:tr><w:tr>');
+
+      const totalRow = [
+        tc('TOTAL', {bold:true, sz:16, span:8, align:'right'}),
+        tc(String(Math.floor(d.taTotal)), {bold:true, sz:16, align:'right'}),
+        tc(paise(d.taTotal), {bold:true, sz:16}),
+      ].join('');
+
+      const tableXml = `<w:tbl>${tblPr}<w:tblGrid>${gridCols}</w:tblGrid>
+        <w:tr>${hdr1}</w:tr>
+        <w:tr>${hdr2}</w:tr>
+        ${dataRows ? '<w:tr>'+dataRows+'</w:tr>' : ''}
+        ${d.conts.length ? '<w:tr>'+cRows2+'</w:tr>' : ''}
+        <w:tr>${totalRow}</w:tr>
+      </w:tbl>`;
+
+      bodyXml += tableXml;
+
+      // Contingent text
+      if (d.conts.length) {
+        bodyXml += para(run('Contingent Charge:-', true, 18), 'left', 30);
+        d.conts.forEach(c => {
+          bodyXml += para(run(`${fmtDateShort(c.date)}  ${c.address} 15X${c.distance}km = ${Math.floor(c.amount)}`, false, 18), 'left', 30);
+        });
+      }
+
+      // Right-aligned totals
+      bodyXml += para(run(`TOTAL  ${Math.floor(d.taTotal)}  ${paise(d.taTotal)}`, true, 18), 'right', 30);
+      if (d.conts.length) bodyXml += para(run(`Contingent  ${Math.floor(d.contTotal)}  00`, true, 18), 'right', 30);
+      bodyXml += para(run(`Grand Total  ${Math.floor(d.grand)}  ${d.conts.length?'00':paise(d.grand)}`, true, 20), 'right', 120);
+
+      // PAGE BREAK before summary
+      bodyXml += `<w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>`;
+
+      // PAGE 2 — Summary
+      bodyXml += para(run('Summary', true, 24), 'right', 120);
+
+      const sumColW = [1400, 1400, 6400];
+      const sumTblPr = `<w:tblPr><w:tblW w:w="${tblW}" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:color="000000"/>
+        </w:tblBorders>
+        <w:tblCellMar><w:top w:w="50" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="50" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar>
+      </w:tblPr><w:tblGrid>${sumColW.map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`;
+
+      const sumRows = [30,70,100].map(p => {
+        const amt = d.hasRate ? d.rate * p/100 : 0;
+        const total = amt * d.tier[p];
+        return `<w:tr>
+          ${tc(p+'%', {sz:18})}
+          ${tc(String(d.tier[p]), {sz:18})}
+          ${tc(`Rs. ${amt.toFixed(1)} X ${d.tier[p]}= Rs. ${total.toFixed(2)}/-  (${Math.round(total)})`, {sz:18, align:'left'})}
+        </w:tr>`;
+      }).join('');
+
+      bodyXml += `<w:tbl>${sumTblPr}
+        <w:tr>${tc('Percentage',{bold:true,sz:18})}${tc('No. of total days',{bold:true,sz:18})}${tc('Rate of TA × Days=Amount',{bold:true,sz:18,align:'left'})}</w:tr>
+        ${sumRows}
+        <w:tr>${tc('Total Contingent Amount:- Rs. =',{bold:true,sz:18,span:2,align:'left'})}${tc(String(Math.round(d.contTotal)),{bold:true,sz:18,align:'left'})}</w:tr>
+        <w:tr>${tc('Total Amount',{bold:true,sz:18,span:2,align:'left'})}${tc('Rs. '+d.grandR+'/- ( Rs. '+toWords(d.grandR)+' Rupees Only. )',{bold:true,sz:18,align:'left'})}</w:tr>
+      </w:tbl>`;
+
+      bodyXml += para('', 'left', 120);
+      bodyXml += para(run('It is certified that:-', false, 18), 'left', 30);
+      bodyXml += para(run('1. The T.A claimed by me has not been claimed before and will not be claimed hereafter.', false, 18), 'left', 30);
+      bodyXml += para(run('2. Conveyance charges claimed have actually been spent by me and according to local municipal rates.', false, 18), 'left', 30);
+      bodyXml += para(run('3. Cheapest mode of conveyance was utilized.', false, 18), 'left', 30);
+      bodyXml += para(run('4. The journey performed by road for which conveyance has been claimed was over 1.6km.', false, 18), 'left', 120);
+      bodyXml += para(run('…………………………………………………………………………………', false, 18), 'right', 30);
+      bodyXml += para(run('Signature of Officer Claiming T.A.', false, 18), 'right', 240);
+      bodyXml += para(run(`I hereby certify that was Sh. ${s.name||''} absent on duty from his headquarter station during the period charged for in the bill on Railway business and that the officer performed the journey by Rail/Sea/Air/Road and was allowed/not allowed free Pass of locomotion at the expense of Government local fund of Indian State.`, false, 18), 'both', 240);
+      bodyXml += para(run('Countersigned', false, 18), 'left', 30);
+      bodyXml += para(run('…………………………………………………………………………………', false, 18), 'right', 30);
+      bodyXml += para(run('Signature of Head of the Office / Controlling Officer', false, 18), 'right', 60);
+
+      if (mr.indexOf(rec) < mr.length-1) {
+        bodyXml += `<w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>`;
+      }
+    });
+
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+  xmlns:v="urn:schemas-microsoft-com:vml"
+  xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:w10="urn:schemas-microsoft-com:office:word"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+  xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+  xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+  xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"
+  xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+  mc:Ignorable="w14 wp14">
+<w:body>
+${bodyXml}
+<w:sectPr>
+  <w:pgSz w:w="11906" w:h="16838"/>
+  <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="708" w:footer="708" w:gutter="0"/>
+</w:sectPr>
+</w:body>
+</w:document>`;
+
+    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault><w:rPr>
+      <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>
+      <w:sz w:val="20"/><w:szCs w:val="20"/>
+    </w:rPr></w:rPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:pPr><w:spacing w:after="60"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="20"/></w:rPr>
+  </w:style>
+</w:styles>`;
+
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+    const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+    // Build ZIP locally — no external/CDN dependency, works fully offline.
+    prog.textContent = '⏳ Packaging document…';
+    const enc = new TextEncoder();
+    const files = {
+      '[Content_Types].xml': enc.encode(contentTypesXml),
+      '_rels/.rels': enc.encode(rootRelsXml),
+      'word/document.xml': enc.encode(documentXml),
+      'word/styles.xml': enc.encode(stylesXml),
+      'word/_rels/document.xml.rels': enc.encode(relsXml),
+    };
+
+    const blob = buildZipBlob(files, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TA_Journal_${moName}_${moYear}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    prog.style.display = 'none';
+    closeExportModal();
+  }
+
+  /* ── Minimal self-contained ZIP (store, no compression) ──
+     Docx/xlsx/pptx files are just ZIP archives; Word/Office are fine
+     opening "stored" (uncompressed) entries, so we don't need a real
+     DEFLATE implementation or any external library/CDN call. This keeps
+     Word export working fully offline / behind firewalls. */
+  function crc32(bytes) {
+    let c, crc = 0xFFFFFFFF;
+    if (!crc32._table) {
+      const table = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        table[n] = c >>> 0;
+      }
+      crc32._table = table;
+    }
+    const table = crc32._table;
+    for (let i = 0; i < bytes.length; i++) {
+      crc = table[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function buildZipBlob(files, mimeType) {
+    const encName = new TextEncoder();
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+    const dosTime = 0, dosDate = 0x21; // fixed arbitrary valid DOS date/time
+
+    for (const [name, data] of Object.entries(files)) {
+      const nameBytes = encName.encode(name);
+      const crc = crc32(data);
+      const size = data.length;
+
+      const localHeader = new DataView(new ArrayBuffer(30));
+      localHeader.setUint32(0, 0x04034b50, true);
+      localHeader.setUint16(4, 20, true);        // version needed
+      localHeader.setUint16(6, 0, true);         // flags
+      localHeader.setUint16(8, 0, true);         // method = 0 (store)
+      localHeader.setUint16(10, dosTime, true);
+      localHeader.setUint16(12, dosDate, true);
+      localHeader.setUint32(14, crc, true);
+      localHeader.setUint32(18, size, true);     // compressed size
+      localHeader.setUint32(22, size, true);     // uncompressed size
+      localHeader.setUint16(26, nameBytes.length, true);
+      localHeader.setUint16(28, 0, true);        // extra field length
+
+      localParts.push(new Uint8Array(localHeader.buffer), nameBytes, data);
+
+      const centralHeader = new DataView(new ArrayBuffer(46));
+      centralHeader.setUint32(0, 0x02014b50, true);
+      centralHeader.setUint16(4, 20, true);      // version made by
+      centralHeader.setUint16(6, 20, true);      // version needed
+      centralHeader.setUint16(8, 0, true);       // flags
+      centralHeader.setUint16(10, 0, true);      // method = store
+      centralHeader.setUint16(12, dosTime, true);
+      centralHeader.setUint16(14, dosDate, true);
+      centralHeader.setUint32(16, crc, true);
+      centralHeader.setUint32(20, size, true);
+      centralHeader.setUint32(24, size, true);
+      centralHeader.setUint16(28, nameBytes.length, true);
+      centralHeader.setUint16(30, 0, true);      // extra length
+      centralHeader.setUint16(32, 0, true);      // comment length
+      centralHeader.setUint16(34, 0, true);      // disk number
+      centralHeader.setUint16(36, 0, true);      // internal attrs
+      centralHeader.setUint32(38, 0, true);      // external attrs
+      centralHeader.setUint32(42, offset, true); // offset of local header
+
+      centralParts.push(new Uint8Array(centralHeader.buffer), nameBytes);
+
+      offset += 30 + nameBytes.length + data.length;
+    }
+
+    const centralStart = offset;
+    let centralSize = 0;
+    centralParts.forEach(p => centralSize += p.length);
+
+    const eocd = new DataView(new ArrayBuffer(22));
+    eocd.setUint32(0, 0x06054b50, true);
+    eocd.setUint16(4, 0, true);
+    eocd.setUint16(6, 0, true);
+    eocd.setUint16(8, Object.keys(files).length, true);
+    eocd.setUint16(10, Object.keys(files).length, true);
+    eocd.setUint32(12, centralSize, true);
+    eocd.setUint32(16, centralStart, true);
+    eocd.setUint16(20, 0, true);
+
+    return new Blob([...localParts, ...centralParts, new Uint8Array(eocd.buffer)], { type: mimeType });
+  }
+
+  function buildAndPrint() { openExportModal(); }
+
+
+  // Close modal on overlay click
+  document.getElementById('settingsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSettings();
+  });
+
+  // Init
+  setMonthBadge();
+  addLeg();
+  checkExistingSession();
+</script>
+</body>
+</html>
