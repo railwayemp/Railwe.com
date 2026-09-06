@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "allowedUsers": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.token.email == 'pnkjverma8@gmail.com' || (auth.uid == $uid && !data.exists()))"
+      }
+    },
+    "userStatus": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.token.email == 'pnkjverma8@gmail.com' || (auth.uid == $uid && !data.exists()))"
+      }
+    },
+    "accessRequests": {
+      ".read": "auth != null && auth.token.email == 'pnkjverma8@gmail.com'",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "appSettings": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email == 'pnkjverma8@gmail.com'"
+    }
+  }
+}
